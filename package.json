@@ -4,6 +4,14 @@
   "description": "Independent DSH bundle that pairs iPhones and iPads with the official DeepSeek Harness Web GUI over the local network.",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/abbaababa/dsh-mobile-access.git"
+  },
+  "homepage": "https://github.com/abbaababa/dsh-mobile-access#readme",
+  "bugs": {
+    "url": "https://github.com/abbaababa/dsh-mobile-access/issues"
+  },
   "publishConfig": {
     "access": "public"
   },

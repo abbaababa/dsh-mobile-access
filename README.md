@@ -1,5 +1,7 @@
 # 手机访问（dsh-mobile-access）
 
+[![verify](https://github.com/abbaababa/dsh-mobile-access/actions/workflows/verify.yml/badge.svg)](https://github.com/abbaababa/dsh-mobile-access/actions/workflows/verify.yml)
+
 > 用 iPhone / iPad 自带的 Safari，安全打开 Mac 上的 DeepSeek Harness Web。
 >
 > **不用装 App，不用改 DSH 源码，不影响 Mac 上原来怎么用。**
@@ -335,7 +337,7 @@ dsh plugin --profile web add dsh-mobile-access@latest --registry=https://registr
 ### 从本机目录安装（开发 / 离线）
 
 ```bash
-git clone <this-repository>
+git clone https://github.com/abbaababa/dsh-mobile-access.git
 cd dsh-mobile-access
 npm install
 npm run verify
@@ -362,7 +364,7 @@ dsh plugin --profile web add /absolute/path/to/dsh-mobile-access-1.0.3.tgz
 - 不需要 DSH 源码 checkout
 
 ```bash
-git clone <this-repository>
+git clone https://github.com/abbaababa/dsh-mobile-access.git
 cd dsh-mobile-access
 npm install
 npm run verify
