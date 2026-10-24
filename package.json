@@ -1,0 +1,55 @@
+{
+  "name": "dsh-mobile-access",
+  "version": "1.0.3",
+  "description": "Independent DSH bundle that pairs iPhones and iPads with the official DeepSeek Harness Web GUI over the local network.",
+  "type": "module",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "exports": {
+    ".": "./index.js",
+    "./client": "./client.js",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "service.js",
+    "routes.js",
+    "html.js",
+    "types.js",
+    "client.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "icon.svg",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "node scripts/build.mjs --check",
+    "test": "node scripts/build.mjs && node --test tests/*.test.mjs",
+    "verify": "bash scripts/verify.sh"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "platform": "web",
+      "immediately": true,
+      "inject": [
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-client-ui-layout",
+        "@deepseek-ai/dsh-client-ui-sidebar"
+      ]
+    }
+  },
+  "devDependencies": {
+    "typescript": "6.0.3"
+  }
+}

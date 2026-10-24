@@ -1,0 +1,13 @@
+# dsh-mobile-access bundle patch.
+#
+# One Host row. The Host half registers exactly three routes:
+#   GET  /m                       public pairing page
+#   GET  /api/mobile-access/state owner-only state snapshot
+#   POST /api/mobile-access/rotate owner-only code rotation
+#
+# The Web client half adds one sidebar entry and one main panel. No core row is
+# replaced, wrapped, or reconfigured. Removing the bundle removes the row.
+- insert:
+    - id: dsh-mobile-access
+      name: dsh-mobile-access
+      config: {}

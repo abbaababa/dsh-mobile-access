@@ -1,0 +1,17 @@
+build/
+node_modules/
+*.tgz
+*.log
+.DS_Store
+backups/
+*.bak
+*.bak-*
+
+# Generated from src/ by scripts/build.mjs. The npm tarball builds these before
+# packing; the GitHub repository keeps source only and CI rebuilds them.
+index.js
+service.js
+routes.js
+html.js
+types.js
+client.js
