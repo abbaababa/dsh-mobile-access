@@ -218,7 +218,7 @@ Windows Defender 防火墙已阻止此应用的部分功能
 | iPhone 端操作 | 一样 | 一样 |
 | Mac/Windows 原有使用 | 不变 | 不变 |
 
-> Windows 的自动化构建和 33 项测试会在 GitHub 的 Windows CI 上运行。
+> Windows 的自动化构建和 33 项测试已在 GitHub 的 Windows CI 上通过。
 > 真正挡住小白的通常不是代码，而是“防火墙点了拒绝”或“Wi-Fi 被设成公用网络”。
 
 ## 适合谁
