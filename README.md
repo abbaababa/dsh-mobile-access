@@ -2,6 +2,8 @@
 
 [![verify](https://github.com/abbaababa/dsh-mobile-access/actions/workflows/verify.yml/badge.svg)](https://github.com/abbaababa/dsh-mobile-access/actions/workflows/verify.yml)
 
+**English (US) — plain-language guide:** [README.en.md](README.en.md)
+
 > 用 iPhone / iPad 自带的 Safari，安全打开 **Mac 或 Windows 10/11** 上的 DeepSeek Harness Web。
 >
 > **不用装 App，不用改 DSH 源码，不影响你原来在电脑上的使用。**
@@ -17,6 +19,68 @@
 3. 一组只在 iPhone/iPad 上生效的输入与触摸小补丁（Return 换行、防自动放大、侧栏手势等）。
 
 其他东西都不动：不改 DSH 核心、不改登录方式、不替换页面、不装后台服务、不拦截现有请求。
+
+---
+
+## English (US) — What This Is
+
+This is a small, independent add-on for the official **DeepSeek Harness (DSH)**
+Web app. It lets **Safari on an iPhone or iPad** open the DSH Web app running on
+your **Mac or Windows 10/11 PC** — without installing a phone app or changing
+DSH itself.
+
+DSH normally protects its page with a very long login link. That link is too
+long to type on a phone. This plugin adds a simpler, temporary way in:
+
+1. The DSH sidebar shows an **8-digit code** on your computer.
+2. You open a short address on the iPhone, ending in `/m`.
+3. You type the 8 digits.
+4. Safari logs in and keeps a secure cookie for **30 days**.
+
+The long login token never appears in the phone’s address bar, browser history,
+or `Referer` header. The code expires after 10 minutes and locks after too many
+wrong attempts.
+
+### Install in one command
+
+Mac Terminal:
+
+```bash
+dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
+```
+
+Windows 10/11 PowerShell (no administrator mode needed):
+
+```powershell
+dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
+```
+
+Then refresh the DSH page, open **Mobile Access** in the left sidebar, and use
+the address and 8-digit code shown there.
+
+If DSH only listens on `127.0.0.1`, the plugin automatically starts a local
+gateway on port `3081`; your computer keeps using `127.0.0.1`, and the phone
+uses `http://<computer-LAN-IP>:3081/m`. On Windows, allow Node.js on **Private
+networks** when the firewall asks.
+
+**This is not a public tunnel or a VPN.** It is for your own trusted Wi-Fi/LAN.
+For access outside the home, the optional Tailscale Serve steps are in the full
+English guide.
+
+### iPhone-only fixes included
+
+- Return adds a new line; the send button sends.
+- Tapping the model switcher does not zoom the page or pop up the keyboard.
+- One tap switches a sidebar session and collapses the sidebar.
+- Swipe right to open the sidebar; tap the conversation content to close it.
+- Switching sessions dismisses the keyboard instead of reopening it.
+
+Mac and Windows desktop behavior is left alone.
+
+**Read the full plain-English guide:
+[README.en.md](README.en.md)** — it includes requirements, pairing steps,
+Windows firewall notes, Tailscale Serve, a troubleshooting table, security
+details, limits, and uninstall instructions.
 
 ---
 
