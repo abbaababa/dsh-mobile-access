@@ -17,14 +17,17 @@ import {
   rmSync,
   writeFileSync,
 } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const checkOnly = process.argv.includes('--check')
 const buildDir = join(root, 'build')
+const require = createRequire(import.meta.url)
 const tscCandidates = [
   process.env.DSH_TSC,
+  join(root, 'node_modules', 'typescript', 'bin', 'tsc'),
   join(root, 'node_modules', '.bin', 'tsc'),
   'tsc',
 ].filter((candidate) => candidate !== undefined)
@@ -38,7 +41,7 @@ function fail(message) {
 if (tsc === undefined) fail('TypeScript compiler not found; set DSH_TSC to a tsc executable.')
 
 function runTsc(args) {
-  const result = spawnSync(tsc, args, { cwd: root, encoding: 'utf8' })
+  const result = spawnSync(tsc === 'tsc' ? tsc : process.execPath, tsc === 'tsc' ? args : [tsc, ...args], { cwd: root, encoding: 'utf8' })
   if (result.error !== undefined) fail(`cannot run tsc: ${result.error.message}`)
   if (result.status !== 0) {
     process.stderr.write(result.stdout ?? '')

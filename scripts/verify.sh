@@ -15,7 +15,7 @@ for file in index.js service.js routes.js html.js types.js client.js; do
 done
 
 echo '[verify] unit and route tests'
-node --test tests
+node scripts/test.mjs
 
 echo '[verify] placeholders'
 if grep -n '__DICT_ZH__\|__DICT_EN__\|__PANEL_CSS__' client.js; then
