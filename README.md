@@ -79,7 +79,7 @@ iPhone 打开「设置 → 无线局域网」，确认和 Mac 连的是同一个
 ### 第 2 步：在 Mac 终端执行一条命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.6 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.7 --registry=https://registry.npmjs.org/
 ```
 
 这条命令做三件事：
@@ -190,16 +190,18 @@ iOS Safari 会把第一次触摸先用去聚焦，第二次才派发 `click`。
 如果左侧栏仍然是窄窄的图标条，第一下是展开侧栏——这是官方布局，不是会话行的问题；
 展开后每个会话只需单击一次。
 
-### iPhone 上左右滑动展开 / 收起左侧栏
+### iPhone 上展开 / 收起左侧栏
 
-从 `1.1.6` 起，iPhone / iPad 上还支持：
+从 `1.1.7` 起，iPhone / iPad 上支持：
 
 - 在对话内容区**向右滑**：展开左侧栏（仅在左侧栏已收起时生效）；
-- 在对话内容区**向左滑**：收起左侧栏（仅在左侧栏已展开时生效）；
-- 滑动需要水平距离至少 70px，且明显大于上下移动，避免和滚动、
-  横向代码块、输入框、模型菜单和右侧面板冲突。
+- 在对话内容区**单击一下**：收起已经展开的左侧栏；
+- 右滑需要水平距离至少 70px，且明显大于上下移动，避免和滚动、
+  横向代码块、输入框、模型菜单和右侧面板冲突；
+- 单击收起只对“内容区”生效，点按钮、输入框、链接、代码块、会话行、
+  模型菜单或右侧面板不会误收起。
 
-普通 Safari 标签页里，手势会避开屏幕左右各 24px 的边缘，以免和 Safari
+普通 Safari 标签页里，右滑会避开屏幕左右各 24px 的边缘，以免和 Safari
 自带的“后退 / 前进”边缘手势抢事件；添加到主屏幕的独立窗口里没有这个
 系统手势，因此边缘也可以滑动。Mac 没有触摸事件，完全不受影响。
 
@@ -383,7 +385,7 @@ iPhone 软键盘没有可用的 Shift 键，因此插件在 **iOS / iPadOS** 上
 ### 推荐：npm 官方命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.6 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.7 --registry=https://registry.npmjs.org/
 ```
 
 ### 使用 `@latest`
@@ -513,7 +515,8 @@ dsh plugin --profile web remove dsh-mobile-access
 - `1.1.0` — 回环监听自动局域网网关（macOS / Windows，HTTP + `/api/remote.mux` WebSocket）。
 - `1.1.1` — iPhone / iPad 上模型选择页 16px 缩放守卫。
 - `1.1.2` — 打开模型选择时不自动弹键盘、不整体上移。
-- `1.1.6` — iPhone / iPad 上右滑展开、左滑收起左侧栏；当前 npm `latest`。
+- `1.1.7` — iPhone / iPad 上右滑展开左侧栏，点击内容区收起；当前 npm `latest`。
+- `1.1.6` — iPhone / iPad 上右滑展开、左滑收起左侧栏。
 - `1.1.5` — Tailscale Serve 经 HTTPS 访问时，允许带 Tailscale 身份头的 `*.ts.net` Host（仅限本机回环转发）。
 - `1.1.4` — iPhone / iPad 上第一次点击直接切换会话，并在切换后自动收起左侧栏。
 - `1.1.3` — 首次尝试临时移除会话行 `tabindex`。

@@ -349,12 +349,14 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
 }
 
 /**
- * Horizontal swipes on iPhone: right opens the left sidebar, left closes it.
- * The gesture is limited to the content area and ignores vertical scrolling,
- * editable controls, menus, code blocks and the right panel. On a normal Safari
- * tab we stay 24px away from the screen edges so the system back/forward gesture
- * keeps priority; an installed PWA has no such gesture, so edge starts are
- * allowed there. Mac never installs this listener.
+ * Right swipe on iPhone opens the left sidebar. The closing gesture is a tap
+ * on the content area (not a left swipe): a normal tap is easier to discover
+ * and does not compete with horizontal scrolling. The swipe is scoped to the
+ * content area and ignores vertical movement, editable controls, menus, code
+ * blocks and the right panel. On a normal Safari tab we stay 24px away from the
+ * screen edges so the system back/forward gesture keeps priority; an installed
+ * PWA has no such gesture, so edge starts are allowed there. Mac never installs
+ * this listener.
  */
 function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
   if (!isAppleMobile() || layout === undefined) return () => undefined
@@ -390,7 +392,7 @@ function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
     const dy = at.y - y
     if (Math.abs(dx) < 70 || Math.abs(dx) <= Math.abs(dy) * 1.5) return
     const collapsed = doc.querySelector('[data-sidebar-collapsed]') !== null
-    if (dx > 0 ? !collapsed : collapsed) return
+    if (!collapsed) return
     try {
       layout.toggleSidebar()
     } catch {
@@ -403,6 +405,37 @@ function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
     doc.removeEventListener('touchstart', onTouchStart, true)
     doc.removeEventListener('touchend', onTouchEnd, true)
   }
+}
+
+/**
+ * A tap on the conversation content closes an expanded narrow sidebar. It has
+ * to run in the bubble phase so message links and buttons still receive their
+ * click first, and it skips every interactive/row/right-panel target. The
+ * sidebar width comes from the frame's inline grid template, so a tap on the
+ * left column is not mistaken for content. Mac and wide layouts are untouched.
+ */
+function installIOSContentTapCollapse(layout?: LayoutService): () => void {
+  if (!isAppleMobile() || layout === undefined) return () => undefined
+  const doc = document
+  const interactive = 'button, a, input, textarea, select, pre, code, [contenteditable="true"], [data-composer-card], [data-row-key], [role="treeitem"], [role="tree"], nav, [role="menu"], [role="listbox"], [role="button"], [role="menuitem"], [data-rightbar]'
+  const onClick = (event: Event): void => {
+    if (window.innerWidth >= 1024) return
+    if (doc.querySelector('[data-sidebar-collapsed]') !== null) return
+    const target = event.target as Element | null
+    if (target === null || typeof target.closest !== 'function' || target.closest(interactive) !== null) return
+    const frame = doc.querySelector('[style*="grid-template-columns"]') as HTMLElement | null
+    const first = frame?.style.gridTemplateColumns.split(' ')[0] ?? ''
+    const width = Number.parseFloat(first)
+    const x = (event as MouseEvent).clientX
+    if (Number.isFinite(width) && x < width) return
+    try {
+      layout.toggleSidebar()
+    } catch {
+      // Layout teardown must never break a click.
+    }
+  }
+  doc.addEventListener('click', onClick, true)
+  return () => doc.removeEventListener('click', onClick, true)
 }
 
 /**

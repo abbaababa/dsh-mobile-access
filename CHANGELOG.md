@@ -1,3 +1,10 @@
+## 1.1.7 — 2026-10-25
+
+- Change the iPhone sidebar closing gesture: a tap in the conversation content
+  closes an expanded sidebar; left swipe no longer collapses it. Right swipe
+  still opens a collapsed rail. Interactive controls, session rows, code blocks,
+  menus and the right panel are ignored, and Mac is untouched.
+
 ## 1.1.6 — 2026-10-25
 
 - Add iOS/iPadOS horizontal sidebar swipes: right opens the collapsed rail,

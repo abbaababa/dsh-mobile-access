@@ -21,6 +21,7 @@ function harness() {
   const headChildren = []
   let sidebarToggles = 0
   let sidebarCollapsed = false
+  const frame = { style: { gridTemplateColumns: '280px minmax(0px, 1fr) minmax(0px, 0px)' } }
   const emit = (type, event) => {
     const entry = listeners.get(type)
     const list = Array.isArray(entry) ? entry : entry === undefined ? [] : [entry]
@@ -149,7 +150,9 @@ function harness() {
         else listeners.set(type, next)
       },
       querySelector(selector) {
-        return selector === '[data-sidebar-collapsed]' && sidebarCollapsed ? {} : null
+        if (selector === '[data-sidebar-collapsed]') return sidebarCollapsed ? {} : null
+        if (selector === '[style*="grid-template-columns"]') return frame
+        return null
       },
       execCommand: (command, _show, value) => { execCommands.push([command, value]); return true },
     },
@@ -358,7 +361,17 @@ test('client bundle registers the sidebar entry and renders the panel without th
   h.sidebarCollapsed = false
   touchstart({ touches: [{ clientX: 300, clientY: 420 }], changedTouches: [{ clientX: 300, clientY: 420 }], target: swipeTarget })
   touchend({ touches: [], changedTouches: [{ clientX: 180, clientY: 430 }] })
-  assert.equal(h.sidebarToggles, 3, 'left swipe must close the expanded sidebar')
+  assert.equal(h.sidebarToggles, 2, 'left swipe must no longer close the sidebar')
+
+  // A normal tap in the conversation content closes the expanded sidebar.
+  const contentTarget = { closest: () => null }
+  h.emit('click', { target: contentTarget, clientX: 320 })
+  assert.equal(h.sidebarToggles, 3, 'a content tap must close the expanded sidebar')
+  h.emit('click', { target: contentTarget, clientX: 100 })
+  assert.equal(h.sidebarToggles, 3, 'a tap in the sidebar column must not toggle it')
+  const buttonTarget = { closest: (selector) => selector.includes('button') ? {} : null }
+  h.emit('click', { target: buttonTarget, clientX: 320 })
+  assert.equal(h.sidebarToggles, 3, 'an interactive target must keep its click')
 
   for (const cleanup of effects.reverse()) cleanup()
   assert.equal(h.context.navigator.clipboard, undefined)
