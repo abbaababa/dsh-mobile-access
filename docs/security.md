@@ -69,6 +69,27 @@ page uses two narrower controls instead:
   `http://openmacbook-pro.tailcc0cfb.ts.net:3080/` or a different port.
 - No cookie is written to disk by this plugin.
 
+## Loopback LAN gateway
+
+For a loopback-only DSH, `gateway.js` listens on `0.0.0.0` and forwards to the
+fixed loopback origin. It is an exposure amplifier by design: every device on
+the reachable LAN can reach the same DSH authentication surface.
+
+- The gateway does not implement its own auth. Pairing, cookies, and the DSH
+  Connection trust fence still decide access; the gateway only rewrites
+  `Host`/`Origin`/`Referer` to the loopback target.
+- It forwards only HTTP and the `/api/remote.mux` WebSocket path; other upgrade
+  paths get `404`.
+- It strips hop-by-hop and client-supplied `x-forwarded-*` headers, rewrites
+  absolute redirects to the public origin, and removes cookie `Domain`
+  attributes so the browser keeps a host-only cookie.
+- It never proxies to a user-supplied target; the target is fixed at plugin
+  startup from `webServer.getOrigin()`.
+- Plain HTTP is visible on the LAN. Do not use the gateway on a hostile network;
+  use a trusted TLS setup instead.
+- On Windows, allow Node.js only on the private network in Windows Firewall.
+- The listener is disposed with the plugin effect.
+
 ## Residual risks
 
 - A user who shares the 8-digit code with an attacker on the same LAN grants

@@ -9,6 +9,7 @@
 │    PairingService (service.js)  ── in-memory code, TTL, failures, locks      │
 │    /m handler (routes.js)       ── pairing page + v1 cookie mint             │
 │    /api/mobile-access/*         ── owner-only Fetch routes                   │
+│    LanGateway (gateway.js)      ── optional 0.0.0.0:3081 for loopback DSH    │
 │                                                                              │
 │  Existing DSH core                                                           │
 │    webServer exact-route table ── /m is matched before the SPA fallback      │
@@ -81,6 +82,27 @@ source of a redirect-loop bug in an earlier draft.
   modulo bias.
 - Comparison is constant-time over equal-length UTF-8 buffers.
 
+## Loopback LAN gateway
+
+`dsh web` binds one concrete address; its default is `127.0.0.1`. When the
+plugin sees a loopback `webServer.getOrigin()`, it starts `LanGateway` inside
+the same host process. When the core is already LAN-bound, the gateway reports
+`available: false` and opens no listener.
+
+- Bind: `0.0.0.0`, preferred `3081`, then the next 10 ports, then port `0`.
+- Target: the unchanged loopback DSH origin.
+- HTTP: `http.request` with `Host`, `Origin`, and `Referer` rewritten to the
+  target; hop-by-hop and client `x-forwarded-*` headers are removed; absolute
+  `Location` is rewritten to the public origin; cookie `Domain` is stripped.
+- WebSocket: only `/api/remote.mux`; a raw `GET` upgrade is forwarded to the
+  loopback listener with the same header rewrite.
+- Public origin: `http://<best LAN IPv4>:<actual port>`, preferring Wi-Fi then
+  Ethernet and deprioritizing `utun`/Tailscale.
+- Lifecycle: start/stop in the same `ctx.effect` as the routes; no DSH restart,
+  no config write, and no change to the Mac's `127.0.0.1` URL.
+- Failure: the listener rejects an unavailable gateway; the panel shows the
+  error. Windows Firewall may need to allow Node.js on the private network.
+
 ## Route ownership
 
 | Route | Owner | Matching | Auth |
@@ -119,9 +141,14 @@ reverse.
 ## Zero-Mac-impact invariants
 
 1. No core source, profile config, auth secret, or existing route is modified.
-2. No global CSS, theme override, root replacement, or second app mount.
+2. No theme override, root replacement, or second app mount. The only injected
+   CSS is the iOS/iPadOS-only 16px zoom guard, scoped to
+   `(hover: none) and (pointer: coarse)`; no rule applies to Mac.
 3. No service worker, cache rewrite, fetch monkey-patch, or WebSocket hook.
-4. No background work when the panel is closed.
-5. The only global change is iOS/iPadOS-only and restored on dispose.
-6. Uninstall leaves the three exact routes unregistered and the DSH SPA
-   fallback untouched.
+4. The LAN gateway starts only for a loopback-bound DSH; a LAN-bound DSH opens
+   no extra listener. The Mac keeps its original URL and no idle timer runs.
+5. All global mutations are iOS/iPadOS-only: the clipboard fallback, the
+   programmatic-search focus guard, and the 16px zoom style. Each is restored or
+   removed on dispose.
+6. Uninstall disposes the three exact routes, the gateway listener, and the
+   client slots; the DSH SPA fallback remains untouched.

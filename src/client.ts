@@ -17,6 +17,7 @@ function createPanel(t: (key: string) => string, locale: LocaleService | undefin
     const toastTimer = React.useRef<number | undefined>(undefined)
     const remaining = useRemaining(state?.expiresAt)
     const status = statusOf(state, loading, error, t)
+    const publicReady = state?.gateway.running === true && state.gateway.publicOrigin !== null
     const isIOS = isAppleMobile()
     const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
       || window.matchMedia('(display-mode: standalone)').matches
@@ -89,7 +90,7 @@ function createPanel(t: (key: string) => string, locale: LocaleService | undefin
             ),
           ),
           h('div', { className: 'dsh-ma-actions' },
-            h('button', { type: 'button', className: 'dsh-ma-button primary', onClick: () => { void copy(state.pairUrl) }, disabled: state.loopback }, t('copyLink')),
+            h('button', { type: 'button', className: 'dsh-ma-button primary', onClick: () => { void copy(state.pairUrl) }, disabled: state.loopback && !publicReady }, t('copyLink')),
             h('button', { type: 'button', className: 'dsh-ma-button', onClick: () => { void copy(state.displayCode) } }, t('copyCode')),
             h('button', { type: 'button', className: 'dsh-ma-button', onClick: () => { void rotate() }, disabled: rotating }, rotating ? t('rotating') : t('rotate')),
           ),
@@ -117,7 +118,18 @@ function createPanel(t: (key: string) => string, locale: LocaleService | undefin
             ? h('p', { className: 'dsh-ma-hint' }, loading ? t('statusLoading') : t('statusError'))
             : h('code', null, state.pairUrl),
           h('p', { className: 'dsh-ma-hint' }, t('urlHint')),
-          state?.loopback ? h('div', { className: 'dsh-ma-alert' }, h('strong', null, t('loopbackTitle')), h('p', null, t('loopbackBody'))) : null,
+          state?.loopback
+            ? state.gateway.running
+              ? h('div', { className: 'dsh-ma-alert is-ok' },
+                  h('strong', null, t('gatewayTitle')),
+                  h('p', null, t('gatewayBody')),
+                  state.gateway.publicOrigin === null ? null : h('code', null, state.gateway.publicOrigin),
+                )
+              : h('div', { className: 'dsh-ma-alert' },
+                  h('strong', null, state.gateway.starting ? t('gatewayStartingTitle') : t('loopbackTitle')),
+                  h('p', null, state.gateway.error ?? t('loopbackBody')),
+                )
+            : null,
         ),
         error !== null ? h('div', { className: 'dsh-ma-alert' },
           h('strong', null, t('errorTitle')),
@@ -138,6 +150,7 @@ function createPanel(t: (key: string) => string, locale: LocaleService | undefin
           h('h2', null, t('diagnosticsTitle')),
           h('dl', { className: 'dsh-ma-meta' },
             h('div', null, h('dt', null, t('bindLabel')), h('dd', null, state === null ? t('unknown') : `${state.bindHost}:${state.port}`)),
+            h('div', null, h('dt', null, t('gatewayLabel')), h('dd', null, state === null ? t('unknown') : state.gateway.running ? (state.gateway.publicOrigin ?? t('gatewayOn')) : t('gatewayOff'))),
             h('div', null, h('dt', null, t('deviceLabel')), h('dd', null, isIOS ? t('deviceIOS') : t('deviceOther'))),
             h('div', null, h('dt', null, t('launchMode')), h('dd', null, standalone ? t('standaloneYes') : t('standaloneNo'))),
             h('div', null, h('dt', null, t('secureYes')), h('dd', null, window.isSecureContext ? t('secureYes') : t('secureNo'))),
@@ -223,6 +236,21 @@ function factory(require: (id: string) => unknown): ClientModule {
           cleanups.push(installIOSReturnNewline())
         } catch (error) {
           ctx.logger?.warn?.(`[mobile-access] iOS Return newline unavailable: ${String(error)}`)
+        }
+        try {
+          cleanups.push(installIOSInputZoomGuard())
+        } catch (error) {
+          ctx.logger?.warn?.(`[mobile-access] iOS input zoom guard unavailable: ${String(error)}`)
+        }
+        try {
+          cleanups.push(installIOSModelKeyboardGuard())
+        } catch (error) {
+          ctx.logger?.warn?.(`[mobile-access] iOS model keyboard guard unavailable: ${String(error)}`)
+        }
+        try {
+          cleanups.push(installIOSSidebarTapGuard())
+        } catch (error) {
+          ctx.logger?.warn?.(`[mobile-access] iOS sidebar tap guard unavailable: ${String(error)}`)
         }
         return () => {
           for (const cleanup of cleanups.reverse()) {

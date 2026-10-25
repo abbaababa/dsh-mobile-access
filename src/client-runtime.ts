@@ -43,11 +43,21 @@ interface MobileAccessState {
   readonly ok: true
   readonly version: number
   readonly origin: string
+  readonly publicOrigin: string
   readonly pairUrl: string
   readonly bindHost: string
   readonly protocol: string
   readonly port: number
   readonly loopback: boolean
+  readonly gateway: {
+    readonly available: boolean
+    readonly running: boolean
+    readonly starting: boolean
+    readonly port: number | null
+    readonly publicOrigin: string | null
+    readonly lanAddresses: readonly string[]
+    readonly error: string | null
+  }
   readonly displayCode: string
   readonly expiresAt: string
   readonly remainingMs: number
@@ -196,6 +206,139 @@ function installClipboardFallback(): () => void {
   return () => undefined
 }
 
+/**
+ * iOS Safari auto-zooms a focused input, textarea, select or contenteditable
+ * whose computed font-size is below 16px. The official model picker's search
+ * field is 12px and the composer's editor is 14px, so tapping the model chip
+ * or its search box zooms the page and leaves the fixed-position model menu
+ * partly off-screen. Force only those editable controls to 16px on coarse
+ * pointers; Mac (fine pointer / hover) is untouched, and pinch zoom remains
+ * available because the viewport meta is not changed.
+ */
+const IOS_INPUT_ZOOM_GUARD_ID = 'dsh-ma-ios-input-zoom-guard'
+const IOS_INPUT_ZOOM_GUARD_CSS = `@media (hover: none) and (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  textarea,
+  select,
+  [contenteditable="true"],
+  [data-composer-input],
+  [role="searchbox"],
+  [role="textbox"] {
+    font-size: 16px !important;
+  }
+  button,
+  [role="button"],
+  [role="menuitem"],
+  [role="menuitemradio"],
+  [data-row-key^="session:"],
+  [role="treeitem"] {
+    touch-action: manipulation;
+    -webkit-user-drag: none;
+  }
+}`
+
+function installIOSInputZoomGuard(): () => void {
+  if (!isAppleMobile()) return () => undefined
+  document.getElementById(IOS_INPUT_ZOOM_GUARD_ID)?.remove()
+  const style = document.createElement('style')
+  style.id = IOS_INPUT_ZOOM_GUARD_ID
+  style.textContent = IOS_INPUT_ZOOM_GUARD_CSS
+  document.head.appendChild(style)
+  return () => style.remove()
+}
+
+/**
+ * The official model menu can move focus into its search field while it opens.
+ * On iPhone that opens the software keyboard and shifts the fixed-position menu
+ * above the visible viewport. Suppress only programmatic search-box focus until
+ * the user deliberately taps that field; blur a focused composer control before
+ * any composer menu opens. Native taps still focus normally, and Mac is untouched.
+ */
+/**
+ * Safari treats a touch on a focusable, non-button row as a focus step: the
+ * first tap focuses the row and only the second tap reaches its click handler.
+ * Official session rows are `role="treeitem"` divs with `tabIndex={0}`, so
+ * switching sessions on iPhone takes two taps. Remove that one attribute for
+ * the duration of the tap on iOS only; React restores it on the next render and
+ * this hook restores it after a short delay, leaving Mac and keyboard access
+ * untouched. `touch-action: manipulation` is also applied in the iOS stylesheet
+ * to avoid the legacy double-tap-zoom delay.
+ */
+function installIOSSidebarTapGuard(): () => void {
+  if (!isAppleMobile()) return () => undefined
+  const doc = document
+  const timers = new Set<number>()
+  const onTouchStart = (event: Event): void => {
+    const target = event.target as Element | null
+    if (target === null || typeof target.closest !== 'function') return
+    const row = target.closest('[data-row-key^="session:"]')
+    if (row === null) return
+    const tabindex = row.getAttribute('tabindex')
+    if (tabindex === null) return
+    row.removeAttribute('tabindex')
+    const timer = window.setTimeout(() => {
+      timers.delete(timer)
+      if (row.isConnected) row.setAttribute('tabindex', tabindex)
+    }, 400)
+    timers.add(timer)
+  }
+  doc.addEventListener('touchstart', onTouchStart, true)
+  return () => {
+    doc.removeEventListener('touchstart', onTouchStart, true)
+    for (const timer of timers) window.clearTimeout(timer)
+    timers.clear()
+  }
+}
+
+function installIOSModelKeyboardGuard(): () => void {
+  if (!isAppleMobile()) return () => undefined
+  if (typeof HTMLInputElement === 'undefined') return () => undefined
+  const doc = document
+  const allowed = new WeakSet<HTMLInputElement>()
+  const onPointerDown = (event: Event): void => {
+    const target = event.target as Element | null
+    if (target === null || typeof target.closest !== 'function') return
+    const search = target.closest('input[role="searchbox"]') as HTMLInputElement | null
+    if (search !== null) {
+      allowed.add(search)
+      return
+    }
+    const trigger = target.closest('button[aria-haspopup="menu"]')
+    if (trigger === null || trigger.closest('[data-composer-card]') === null) return
+    const active = doc.activeElement as { blur?: () => void } | null
+    if (active !== null && active !== trigger && typeof active.blur === 'function') {
+      try {
+        active.blur()
+      } catch {
+        // A non-HTMLElement active element is harmless here.
+      }
+    }
+  }
+  const prototype = HTMLInputElement.prototype
+  const originalFocus = prototype.focus
+  const guardedFocus = function (this: HTMLInputElement, options?: FocusOptions): void {
+    if (this.getAttribute('role') === 'searchbox' && !allowed.has(this)) return
+    originalFocus.call(this, options)
+  }
+  Object.defineProperty(prototype, 'focus', {
+    configurable: true,
+    writable: true,
+    value: guardedFocus,
+  })
+  doc.addEventListener('pointerdown', onPointerDown, true)
+  return () => {
+    doc.removeEventListener('pointerdown', onPointerDown, true)
+    if (prototype.focus === guardedFocus) {
+      Object.defineProperty(prototype, 'focus', {
+        configurable: true,
+        writable: true,
+        value: originalFocus,
+      })
+    }
+  }
+}
+
+
 function useMobileAccessState(): {
   readonly state: MobileAccessState | null
   readonly loading: boolean
@@ -313,7 +456,11 @@ function statusOf(state: MobileAccessState | null, loading: boolean, error: stri
 } {
   if (error !== null) return { label: t('statusError'), tone: 'bad' }
   if (state === null) return { label: loading ? t('statusLoading') : t('statusError'), tone: 'muted' }
-  if (state.loopback) return { label: t('statusLoopback'), tone: 'bad' }
+  if (state.loopback) {
+    if (state.gateway.running) return { label: t('statusGateway'), tone: 'ok' }
+    if (state.gateway.starting) return { label: t('statusGatewayStarting'), tone: 'warn' }
+    return { label: t('statusLoopback'), tone: 'bad' }
+  }
   if (state.locked) return { label: t('statusLocked'), tone: 'bad' }
   if (state.expired) return { label: t('statusExpired'), tone: 'warn' }
   return { label: t('statusReady'), tone: 'ok' }

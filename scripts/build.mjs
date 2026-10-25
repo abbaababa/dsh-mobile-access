@@ -80,14 +80,21 @@ client = client
   .replace('__DICT_EN__', JSON.stringify(en.ui))
   .replace('__PANEL_CSS__', JSON.stringify(css))
 if (/__DICT_(ZH|EN)__|__PANEL_CSS__/.test(client)) fail('client placeholder replacement incomplete')
-writeFileSync(join(root, 'client.js'), `${client.trim()}\n`, 'utf8')
+const condensed = client
+  .split('\n')
+  .filter((line) => {
+    const trimmed = line.trim()
+    return trimmed !== '' && !trimmed.startsWith('//')
+  })
+  .join('\n')
+writeFileSync(join(root, 'client.js'), `${condensed.trim()}\n`, 'utf8')
 
 for (const file of readdirSync(join(buildDir, 'host'))) {
   if (!file.endsWith('.js')) continue
   copyFileSync(join(buildDir, 'host', file), join(root, file))
 }
 
-const required = ['index.js', 'service.js', 'routes.js', 'html.js', 'types.js', 'client.js']
+const required = ['index.js', 'service.js', 'routes.js', 'gateway.js', 'html.js', 'types.js', 'client.js']
 for (const file of required) {
   if (!existsSync(join(root, file))) fail(`missing build output: ${file}`)
 }

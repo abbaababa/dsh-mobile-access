@@ -8,18 +8,23 @@ to restart DSH, Node, macOS, SSH, the network, or a terminal.
 
 ## Preconditions
 
-- DSH Web is running and bound to a LAN address (not `127.0.0.1`).
+- DSH Web is running. It may be bound to a LAN address or to `127.0.0.1`.
+- For a loopback-only DSH, the plugin's LAN gateway must be able to bind
+  `0.0.0.0:3081` (10 fallback ports, then an ephemeral port). Allow Node.js on
+  the private network in Windows Firewall on Windows 10/11.
 - The Mac and iPhone are on the same LAN and can reach each other.
 - The profile has `webServer` and `connection` services (official DSH Web).
 - Node >= 22; this project builds with TypeScript 6.0.3 from the DSH checkout.
 
-Check the listener:
+Check the listeners:
 
 ```bash
 lsof -nP -iTCP:3080 -sTCP:LISTEN
+lsof -nP -iTCP:3081 -sTCP:LISTEN
 ```
 
-Expected: one `LISTEN` on the Mac's LAN address, not `127.0.0.1`.
+A LAN-bound DSH shows `3080` on the LAN address and no `3081`.
+A loopback DSH shows `127.0.0.1:3080` and the plugin gateway on `*:3081`.
 
 ## Build and gate
 

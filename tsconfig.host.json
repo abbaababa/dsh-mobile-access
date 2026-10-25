@@ -4,7 +4,7 @@
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "lib": ["ES2022", "DOM"],
-    "types": [],
+    "types": ["node"],
     "strict": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
@@ -23,6 +23,7 @@
     "src/index.ts",
     "src/service.ts",
     "src/routes.ts",
+    "src/gateway.ts",
     "src/html.ts",
     "src/types.ts"
   ]

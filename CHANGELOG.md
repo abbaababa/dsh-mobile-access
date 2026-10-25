@@ -1,5 +1,48 @@
 # Changelog
 
+## 1.1.3 — 2026-10-25
+
+- Make the first tap on an iPhone/iPad session row activate that session.
+  Safari treats a click on the focusable `role="treeitem"` row (official
+  `tabIndex={0}`) as a focus step before dispatching `click`; the plugin now
+  removes that one attribute during the touch and restores it 400 ms later.
+  Session rows also receive `touch-action: manipulation` so the legacy
+  double-tap-zoom delay cannot consume the tap. The patch is installed only on
+  Apple mobile devices; Mac and keyboard users are untouched. 32/32 tests pass.
+
+## 1.1.2 — 2026-10-25
+
+- Stop the iPhone software keyboard from opening automatically when the
+  bottom-right model switcher is tapped. On iOS/iPadOS only, a programmatic
+  focus of the model menu's `input[role="searchbox"]` is suppressed until the
+  user deliberately taps that field; tapping a composer menu trigger also
+  blurs the active composer field first. The model menu therefore opens without
+  the keyboard and does not shift upward. Native taps, search typing, and Mac
+  behavior are preserved. 32/32 tests pass.
+
+## 1.1.1 — 2026-10-24
+
+- Stop iOS Safari from auto-zooming when the bottom-right model switcher or
+  its 12px search field receives focus. On iPhone/iPad only, an injected
+  `@media (hover: none) and (pointer: coarse)` rule forces editable controls
+  (inputs, textarea, select, contenteditable, the composer, and the model
+  searchbox) to 16px, and gives buttons/menu rows `touch-action: manipulation`.
+  This keeps the fixed-position model menu inside the visual viewport and
+  leaves Mac and non-Apple platforms untouched. 32/32 tests pass.
+
+## 1.1.0 — 2026-10-24
+
+- Add an automatic LAN gateway for a DSH instance bound only to `127.0.0.1`
+  (macOS 27, Windows 10/11). The official listener and the Mac URL stay
+  unchanged; the plugin opens a separate IPv4 listener on `3081` (10 fallback
+  ports, then an ephemeral port), proxies HTTP, and proxies only the
+  `/api/remote.mux` WebSocket upgrade. Host/Origin/Referer are rewritten to the
+  loopback target so the existing Connection trust fence and cookie authority
+  keep working; absolute redirects and cookie `Domain` attributes are rewritten
+  for the LAN origin. The pairing page and panel use the public LAN URL, and the
+  panel reports gateway state/errors. LAN-bound DSH opens no extra listener.
+  Never starts or restarts DSH itself. 32/32 tests pass.
+
 ## 1.0.3 — 2026-10-24
 
 - Harden the iPhone Return-newline hook: after redefining `shiftKey` to the

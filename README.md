@@ -65,7 +65,7 @@ iPhone 打开短地址 /m
 ## 不适合谁
 
 - 想在**外网**（不在同一个 Wi-Fi）访问家里的 Mac：这不是 VPN / 内网穿透工具，请不要把 DSH 直接暴露到公网。
-- Mac 的 DSH 只监听 `127.0.0.1`：手机根本连不到，需要先把监听地址改为 Mac 的局域网 IP。
+- Mac 的 DSH 只监听 `127.0.0.1`：`1.1.0` 起插件会**自动**在 `3081` 起一个只做转发的局域网网关，Mac 仍用 `127.0.0.1`，不需要改 Host 配置，也不需要把 DSH 暴露到公网。
 - 使用 HTTPS 但证书不被 iPhone 信任：Safari 会先拦截证书，这和插件无关。
 
 ---
@@ -79,7 +79,7 @@ iPhone 打开「设置 → 无线局域网」，确认和 Mac 连的是同一个
 ### 第 2 步：在 Mac 终端执行一条命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.0.3 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.3 --registry=https://registry.npmjs.org/
 ```
 
 这条命令做三件事：
@@ -91,6 +91,20 @@ dsh plugin --profile web add dsh-mobile-access@1.0.3 --registry=https://registry
 > `--profile web` 里的 `web` 是本项目使用的 profile 名称。  
 > 如果你的 DSH 用的是其他 profile，把 `web` 换成实际名称即可。  
 > 不确定时，照抄这条命令；如果提示 profile 不存在，再检查你平时启动 DSH 用的名称。
+
+### 如果 DSH 只监听 `127.0.0.1`
+
+从 `1.1.0` 开始不需要改 DSH 配置。插件检测到回环监听后，会自动在
+`3081` 起一个只做转发的局域网网关：
+
+- Mac 继续使用原来的 `http://127.0.0.1:3080`，行为不变；
+- iPhone 使用面板上显示的 `http://<Mac 局域网 IP>:3081/m`；
+- 网关会同时转发 DSH 的 `/api/remote.mux` WebSocket，聊天流不受影响；
+- 如果 `3081` 被占用，会自动尝试后 10 个端口，面板会显示实际地址。
+
+**Windows 10 / 11 注意**：第一次启动时 Windows 防火墙可能询问是否允许
+Node.js 访问网络，请勾选“专用网络”并允许；如果误点了拒绝，到“Windows
+安全中心 → 防火墙和网络保护 → 允许应用通过防火墙”里放行 Node.js。
 
 ### 第 3 步：刷新 DSH 页面
 
@@ -161,6 +175,34 @@ Safari 分享按钮 → 添加到主屏幕
 - 插件只在 iPhone / iPad 上安装「Return 换行」监听，Mac 和非 Apple 平台不会安装；
 - 左边栏只多一个「手机访问」入口，其他入口和面板保持原样。
 
+### iPhone 上切换左侧栏会话为什么要两次点击
+
+如果你在左侧栏已经展开、能看到会话标题的情况下，点第一下没有切换、点第二下才切换，
+这是官方会话行的触摸行为：每一行是 `role="treeitem"`、`tabindex="0"` 的可聚焦元素，
+iOS Safari 会把第一次触摸先用去聚焦，第二次才派发 `click`。
+
+从 `1.1.3` 起，插件只在 iPhone / iPad 上、在你触摸会话行的那一刻临时移除该行的
+`tabindex`，400 毫秒后自动恢复；同时给会话行加 `touch-action: manipulation`，
+避免旧式双击缩放延迟。Mac 和键盘操作不受影响。展开侧栏后，点一次会话标题即可切换。
+
+如果左侧栏仍然是窄窄的图标条，第一下是展开侧栏——这是官方布局，不是会话行的问题；
+展开后每个会话只需单击一次。
+
+### iPhone 上切换大模型时页面放大、键盘自动弹出怎么办
+
+从 `1.1.2` 起不需要改 DSH，也不需要关掉 Safari 的缩放：
+
+- 插件只在 iPhone / iPad 上把可编辑控件（输入框、模型搜索框、提示词编辑器）
+  的字号固定到 16px，并给按钮加 `touch-action: manipulation`，避免 iOS
+  Safari 因为字号小于 16px 自动放大页面；
+- 打开右下角模型选择时，插件不会让模型搜索框自动抢焦点，所以键盘不会自动
+  弹出；需要搜索时，点一下搜索框再输入即可；
+- 如果提示词键盘本来就是打开的，点模型入口时会先收起键盘；
+- Mac 和非 Apple 平台不安装这些处理，行为保持原样。
+
+如果页面已经处于放大状态，先点 Safari 地址栏刷新一次，或双击页面空白处
+复位，再重新打开模型选择即可。
+
 ### 配对码过期了怎么办
 
 配对码默认 **10 分钟**有效。过期后：
@@ -207,8 +249,8 @@ Safari 分享按钮 → 添加到主屏幕
 按顺序检查：
 
 1. iPhone 和 Mac 是不是同一个 Wi-Fi；
-2. 地址是不是 Mac 的**局域网 IP**，而不是 `127.0.0.1`；
-3. DSH 是否只监听了回环地址；
+2. 地址是不是 Mac 面板上显示的**完整地址**（回环监听时通常是 `:3081`，局域网监听时可能是 `:3080`）；
+3. Mac 面板的「局域网网关」是否显示「已开启」；如果显示错误，按提示检查 Windows 防火墙或端口占用；
 4. 路由器是否开启了「客户端隔离 / AP 隔离」（开启后同一 Wi-Fi 的设备也不能互访）。
 
 ### 2. 左边栏没有「手机访问」
@@ -225,13 +267,13 @@ Safari 分享按钮 → 添加到主屏幕
 
 ### 4. 提示「请求未通过 Host 或来源校验」
 
-- 确认你访问的是 Mac 面板上显示的完整地址（包括 `:3080`）；
+- 确认你访问的是 Mac 面板上显示的完整地址（包括实际端口，回环网关通常是 `:3081`）；
 - 不要用另一个域名 / IP 混着访问；
-- 升级到 `1.0.0` 及以上版本。`1.0.0` 已修复早期 iOS Safari 表单提交被误判的问题。
+- 升级到 `1.1.0` 及以上版本。`1.1.0` 同时修复早期 iOS Safari 表单提交被误判的问题，并加入回环网关。
 
 ### 5. iPhone 按 Return 还是直接发送
 
-- 确认版本是 `1.0.3` 或更高；
+- 确认版本是 `1.1.0` 或更高；
 - 安装/升级后刷新一次页面，让新的 `client.js` 生效；
 - 如果仍然直接发送，请记录 iPhone 型号、iOS 版本和页面地址，提交 issue。
 
@@ -322,7 +364,7 @@ iPhone 软键盘没有可用的 Shift 键，因此插件在 **iOS / iPadOS** 上
 ### 推荐：npm 官方命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.0.3 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.3 --registry=https://registry.npmjs.org/
 ```
 
 ### 使用 `@latest`
@@ -348,7 +390,7 @@ dsh plugin --profile web add /absolute/path/to/dsh-mobile-access
 
 ```bash
 npm pack
-dsh plugin --profile web add /absolute/path/to/dsh-mobile-access-1.0.3.tgz
+dsh plugin --profile web add /absolute/path/to/dsh-mobile-access-1.1.0.tgz
 ```
 
 > GitHub 仓库是源码与文档的家；日常安装请优先用 npm 一条命令，不要求用户自己编译。
@@ -437,7 +479,7 @@ dsh plugin --profile web remove dsh-mobile-access
 - 左侧栏入口消失；
 - `/m` 恢复为普通 SPA fallback（不再是配对页）；
 - `/api/mobile-access/*` 不再注册；
-- iOS 剪贴板回退和 Return 换行监听被清理。
+- iOS 剪贴板回退、Return 换行监听、16px 缩放守卫和模型搜索焦点守卫被清理。
 
 已签发的登录 Cookie 可能仍留在浏览器中，直到过期；这是 DSH 认证层的行为，不是插件额外写入的凭证。
 
@@ -448,7 +490,11 @@ dsh plugin --profile web remove dsh-mobile-access
 - `1.0.0` — 首个工程化版本：配对页、owner-only 状态/刷新、左侧栏面板、零 Mac 影响边界、单元/路由/静态门禁。
 - `1.0.1` — 安装文档与 npm 发布元数据。
 - `1.0.2` — iPhone / iPad 自带键盘 Return 换行。
-- `1.0.3` — Safari 不支持改写键盘事件时的换行回退；当前 npm `latest`。
+- `1.0.3` — Safari 不支持改写键盘事件时的换行回退。
+- `1.1.0` — 回环监听自动局域网网关（macOS / Windows，HTTP + `/api/remote.mux` WebSocket）。
+- `1.1.1` — iPhone / iPad 上模型选择页 16px 缩放守卫。
+- `1.1.2` — 打开模型选择时不自动弹键盘、不整体上移。
+- `1.1.3` — iPhone / iPad 上会话行第一次点击即可切换；当前 npm `latest`。
 
 ## 许可证
 

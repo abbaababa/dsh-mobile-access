@@ -5,6 +5,7 @@
  */
 
 import { contentSecurityPolicy, renderMessagePage, renderPairingPage } from './html.js'
+import { EMPTY_GATEWAY_STATUS, type LanGateway, type LanGatewayStatus } from './gateway.js'
 import {
   constantTimeEqual,
   isLoopbackHost,
@@ -31,12 +32,14 @@ export interface MobileAccessState extends PairingSnapshot {
   readonly ok: true
   readonly version: 1
   readonly origin: string
+  readonly publicOrigin: string
   readonly pairPath: '/m'
   readonly pairUrl: string
   readonly bindHost: string
   readonly protocol: string
   readonly port: number
   readonly loopback: boolean
+  readonly gateway: LanGatewayStatus
 }
 
 class PayloadTooLargeError extends Error {
@@ -224,20 +227,33 @@ function jsonResponse(payload: MobileAccessState, status = 200): Response {
   })
 }
 
-function statePayload(ctx: PluginContext, service: PairingService): MobileAccessState {
+function publicOriginOf(gateway: LanGateway | undefined): string | null {
+  const status = gateway?.status()
+  return status?.running === true && status.publicOrigin !== null ? status.publicOrigin : null
+}
+
+function statePayload(
+  ctx: PluginContext,
+  service: PairingService,
+  gateway: LanGateway | undefined,
+): MobileAccessState {
   const origin = originOf(ctx)
+  const gatewayStatus = gateway?.status() ?? EMPTY_GATEWAY_STATUS
+  const publicOrigin = publicOriginOf(gateway) ?? origin
   const snapshot = service.snapshot()
   return {
     ...snapshot,
     ok: true,
     version: 1,
     origin,
+    publicOrigin,
     pairPath: PAIR_PATH,
-    pairUrl: new URL(PAIR_PATH, origin).href,
+    pairUrl: new URL(PAIR_PATH, publicOrigin).href,
     bindHost: ctx.webServer.host,
     protocol: protocolOf(ctx),
     port: ctx.webServer.port,
     loopback: isLoopbackHost(ctx.webServer.host),
+    gateway: gatewayStatus,
   }
 }
 
@@ -246,12 +262,14 @@ function pairingPage(
   service: PairingService,
   request: RequestLike,
   nonce: string,
+  gateway: LanGateway | undefined,
   error?: string,
 ): string {
   const snapshot = service.snapshot()
+  const publicOrigin = publicOriginOf(gateway)
   return renderPairingPage({
     ...(error === undefined ? {} : { error }),
-    host: requestHost(ctx, request),
+    host: publicOrigin === null ? requestHost(ctx, request) : new URL(publicOrigin).host,
     expiresAt: snapshot.expiresAt,
     expired: snapshot.expired,
     locked: snapshot.locked,
@@ -266,13 +284,14 @@ function sendPairing(
   service: PairingService,
   request: RequestLike,
   response: ResponseLike,
+  gateway: LanGateway | undefined,
   error?: string,
   status = 200,
   extraHeaders: Readonly<Record<string, string>> = {},
 ): void {
   const nonce = pairingNonce()
   response.setHeader('set-cookie', pairingCookie(nonce))
-  sendHtml(response, status, pairingPage(ctx, service, request, nonce, error), extraHeaders)
+  sendHtml(response, status, pairingPage(ctx, service, request, nonce, gateway, error), extraHeaders)
 }
 
 function refusalPage(title: string, message: string, detail?: string): string {
@@ -365,6 +384,7 @@ async function handleGet(
   service: PairingService,
   request: RequestLike,
   response: ResponseLike,
+  gateway: LanGateway | undefined,
 ): Promise<void> {
   const captured = new CapturedResponse()
   const allowed = ctx.connection.authorizeIndex({
@@ -378,7 +398,7 @@ async function handleGet(
     return
   }
   if (replayCaptured(response, captured)) return
-  sendPairing(ctx, service, request, response)
+  sendPairing(ctx, service, request, response, gateway)
 }
 
 async function handlePost(
@@ -386,6 +406,7 @@ async function handlePost(
   service: PairingService,
   request: RequestLike,
   response: ResponseLike,
+  gateway: LanGateway | undefined,
 ): Promise<void> {
   const contentType = (firstHeader(request.headers, 'content-type') ?? '').toLowerCase()
   if (!contentType.startsWith('application/x-www-form-urlencoded')) {
@@ -409,7 +430,7 @@ async function handlePost(
   const nonce = params.get('nonce') ?? ''
   const expectedNonce = cookieValue(request.headers, PAIR_COOKIE) ?? ''
   if (nonce === '' || expectedNonce === '' || !constantTimeEqual(nonce, expectedNonce)) {
-    sendPairing(ctx, service, request, response, '配对页已过期，请刷新后重试。', 403)
+    sendPairing(ctx, service, request, response, gateway, '配对页已过期，请刷新后重试。', 403)
     return
   }
 
@@ -425,6 +446,7 @@ async function handlePost(
       service,
       request,
       response,
+      gateway,
       failureMessage(result.reason),
       result.reason === 'rate' ? 429 : 200,
       extra,
@@ -460,6 +482,7 @@ async function handlePost(
 export function createPairingHandler(
   ctx: PluginContext,
   service: PairingService,
+  gateway?: LanGateway,
 ): (request: RequestLike, response: ResponseLike) => Promise<void> {
   return async (request, response) => {
     if (!pairingHostAllowed(ctx, request)) {
@@ -469,11 +492,11 @@ export function createPairingHandler(
 
     const method = (request.method ?? 'GET').toUpperCase()
     if (method === 'GET') {
-      await handleGet(ctx, service, request, response)
+      await handleGet(ctx, service, request, response, gateway)
       return
     }
     if (method === 'POST') {
-      await handlePost(ctx, service, request, response)
+      await handlePost(ctx, service, request, response, gateway)
       return
     }
     response.setHeader('allow', 'GET, POST')
@@ -485,7 +508,11 @@ export function createPairingHandler(
  * Register all three routes. The returned disposer removes them in reverse
  * order; every registration is attempted only once.
  */
-export function registerMobileAccess(ctx: PluginContext, service: PairingService): () => void {
+export function registerMobileAccess(
+  ctx: PluginContext,
+  service: PairingService,
+  gateway?: LanGateway,
+): () => void {
   let pairing: (() => void) | undefined
   let state: (() => Promise<void>) | undefined
   let rotate: (() => Promise<void>) | undefined
@@ -494,7 +521,7 @@ export function registerMobileAccess(ctx: PluginContext, service: PairingService
     path: STATE_PATH,
     methods: ['GET'],
     requestBody: 'buffered',
-    fetch: () => Promise.resolve(jsonResponse(statePayload(ctx, service))),
+    fetch: () => Promise.resolve(jsonResponse(statePayload(ctx, service, gateway))),
   }
   const rotateRoute: FetchRouteLike = {
     path: ROTATE_PATH,
@@ -502,7 +529,7 @@ export function registerMobileAccess(ctx: PluginContext, service: PairingService
     requestBody: 'buffered',
     fetch: () => {
       service.rotate()
-      return Promise.resolve(jsonResponse(statePayload(ctx, service)))
+      return Promise.resolve(jsonResponse(statePayload(ctx, service, gateway)))
     },
   }
 
@@ -510,7 +537,7 @@ export function registerMobileAccess(ctx: PluginContext, service: PairingService
     pairing = ctx.webServer.register({
       kind: 'exact',
       path: PAIR_PATH,
-      handler: createPairingHandler(ctx, service),
+      handler: createPairingHandler(ctx, service, gateway),
     })
     state = ctx.connection.fetch.register(stateRoute)
     rotate = ctx.connection.fetch.register(rotateRoute)

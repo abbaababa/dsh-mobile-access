@@ -18,6 +18,7 @@ function harness() {
   let icon
   const listeners = new Map()
   const execCommands = []
+  const headChildren = []
 
   const React = {
     createElement(type, props, ...children) {
@@ -50,6 +51,21 @@ function harness() {
     bind() { return (key) => `t:${key}` },
     getSnapshot() { return { revision: 1 } },
     subscribe() { return () => undefined },
+  }
+
+  class HTMLInputElement {
+    constructor() {
+      this.attributes = {}
+      this.focused = false
+    }
+    getAttribute(name) { return this.attributes[name] ?? null }
+    setAttribute(name, value) { this.attributes[name] = value }
+    closest(selector) {
+      return selector === 'input[role="searchbox"]' && this.getAttribute('role') === 'searchbox'
+        ? this
+        : null
+    }
+    focus() { this.focused = true }
   }
 
   const slots = {
@@ -90,13 +106,25 @@ function harness() {
     document: {
       visibilityState: 'visible',
       body: { appendChild() {}, removeChild() {} },
-      createElement: () => ({
-        style: {},
-        setAttribute() {},
-        select() {},
-        setSelectionRange() {},
-        remove() {},
-      }),
+      head: {
+        appendChild(node) { headChildren.push(node) },
+      },
+      getElementById(id) { return headChildren.find((node) => node.id === id) ?? null },
+      createElement(tagName) {
+        return {
+          tagName,
+          id: '',
+          textContent: '',
+          style: {},
+          setAttribute() {},
+          select() {},
+          setSelectionRange() {},
+          remove() {
+            const index = headChildren.indexOf(this)
+            if (index >= 0) headChildren.splice(index, 1)
+          },
+        }
+      },
       addEventListener(type, listener) { listeners.set(type, listener) },
       removeEventListener(type) { listeners.delete(type) },
       querySelector() { return null },
@@ -114,6 +142,16 @@ function harness() {
           protocol: 'http:',
           port: 3080,
           loopback: false,
+          publicOrigin: 'http://192.0.2.10:3080',
+          gateway: {
+            available: false,
+            running: false,
+            starting: false,
+            port: null,
+            publicOrigin: null,
+            lanAddresses: [],
+            error: null,
+          },
           displayCode: '1234 5678',
           expiresAt: new Date(Date.now() + 600000).toISOString(),
           remainingMs: 600000,
@@ -145,8 +183,9 @@ function harness() {
     Promise,
     console,
   }
+  context.HTMLInputElement = HTMLInputElement
   context.globalThis = context
-  return { context, errors, registrations, listeners, execCommands, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
+  return { context, errors, registrations, listeners, execCommands, headChildren, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
 }
 
 test('client bundle registers the sidebar entry and renders the panel without throwing', async () => {
@@ -187,6 +226,14 @@ test('client bundle registers the sidebar entry and renders the panel without th
 
   // iOS + HTTP: the guarded fallback must be present while the plugin is active.
   assert.equal(typeof h.context.navigator.clipboard?.writeText, 'function')
+
+  // iOS Safari must not auto-zoom the 12px model search or the composer.
+  const zoomGuard = h.headChildren.find((node) => node.id === 'dsh-ma-ios-input-zoom-guard')
+  assert.ok(zoomGuard, 'iOS input zoom guard style must be installed')
+  assert.match(zoomGuard.textContent, /@media \(hover: none\) and \(pointer: coarse\)/)
+  assert.match(zoomGuard.textContent, /font-size: 16px !important/)
+  assert.match(zoomGuard.textContent, /\[data-composer-input\]/)
+  assert.match(zoomGuard.textContent, /\[role="searchbox"\]/)
 
   // iOS Return must look like Shift+Enter to Lexical so the native newline wins.
   const keydown = h.listeners.get('keydown')
@@ -232,7 +279,55 @@ test('client bundle registers the sidebar entry and renders the panel without th
   assert.equal(fallbackStopped, true)
   assert.equal(h.execCommands.at(-1)[0], 'insertLineBreak')
 
+  // A programmatic focus of the model search must not open the keyboard until
+  // the user actually taps that search field.
+  const pointerdown = h.listeners.get('pointerdown')
+  assert.equal(typeof pointerdown, 'function')
+  const searchbox = new h.context.HTMLInputElement()
+  searchbox.setAttribute('role', 'searchbox')
+  searchbox.focus()
+  assert.equal(searchbox.focused, false, 'guarded programmatic search focus must stay closed')
+  pointerdown({ target: searchbox })
+  searchbox.focus()
+  assert.equal(searchbox.focused, true, 'a deliberate tap must allow native search focus')
+
+  // Opening a composer menu must dismiss an already-open composer keyboard.
+  let blurred = false
+  h.context.document.activeElement = { blur() { blurred = true } }
+  const trigger = {
+    closest(selector) {
+      if (selector === 'button[aria-haspopup="menu"]') return trigger
+      if (selector === '[data-composer-card]') return {}
+      return null
+    },
+  }
+  pointerdown({ target: trigger })
+  assert.equal(blurred, true, 'composer menu tap must blur the active field')
+
+  // Safari focuses a clickable div carrying tabIndex before it dispatches click.
+  // The iOS guard removes that attribute for the tap so the first tap switches
+  // the session instead of only focusing the row.
+  const touchstart = h.listeners.get('touchstart')
+  assert.equal(typeof touchstart, 'function')
+  const row = {
+    attributes: { tabindex: '0' },
+    isConnected: true,
+    getAttribute(name) { return this.attributes[name] ?? null },
+    setAttribute(name, value) { this.attributes[name] = value },
+    removeAttribute(name) { delete this.attributes[name] },
+    closest(selector) { return selector === '[data-row-key^="session:"]' ? this : null },
+  }
+  touchstart({ target: row })
+  assert.equal(row.getAttribute('tabindex'), null, 'first tap must not be consumed by focus')
+
   for (const cleanup of effects.reverse()) cleanup()
   assert.equal(h.context.navigator.clipboard, undefined)
   assert.equal(h.listeners.has('keydown'), false)
+  assert.equal(h.listeners.has('pointerdown'), false)
+  assert.equal(h.listeners.has('touchstart'), false)
+  assert.equal(h.headChildren.length, 0, 'zoom guard style must be removed on cleanup')
+  const restored = new h.context.HTMLInputElement()
+  restored.setAttribute('role', 'searchbox')
+  restored.focus()
+  assert.equal(restored.focused, true, 'cleanup must restore the native focus method')
 })
