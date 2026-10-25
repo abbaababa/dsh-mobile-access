@@ -79,7 +79,7 @@ iPhone 打开「设置 → 无线局域网」，确认和 Mac 连的是同一个
 ### 第 2 步：在 Mac 终端执行一条命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.3 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.4 --registry=https://registry.npmjs.org/
 ```
 
 这条命令做三件事：
@@ -181,12 +181,18 @@ Safari 分享按钮 → 添加到主屏幕
 这是官方会话行的触摸行为：每一行是 `role="treeitem"`、`tabindex="0"` 的可聚焦元素，
 iOS Safari 会把第一次触摸先用去聚焦，第二次才派发 `click`。
 
-从 `1.1.3` 起，插件只在 iPhone / iPad 上、在你触摸会话行的那一刻临时移除该行的
-`tabindex`，400 毫秒后自动恢复；同时给会话行加 `touch-action: manipulation`，
-避免旧式双击缩放延迟。Mac 和键盘操作不受影响。展开侧栏后，点一次会话标题即可切换。
+从 `1.1.4` 起，插件在 iPhone / iPad 上不再依赖“移除 `tabindex` 后等浏览器补发 click”
+这一条不确定路径：第一次触摸结束时就主动触发该会话行的点击，并抑制随后可能重复的
+原生点击，因此一次点击只会切换一次；切换完成后，窄屏左侧栏会自动收起，把空间还给
+对话区。会话行同时加 `touch-action: manipulation`，避免旧式双击缩放延迟。Mac 和
+键盘操作不受影响。
 
 如果左侧栏仍然是窄窄的图标条，第一下是展开侧栏——这是官方布局，不是会话行的问题；
 展开后每个会话只需单击一次。
+
+`1.1.3` 的旧实现只移除 `tabindex`，在部分 iOS Safari 版本上仍可能被第一次触摸吃掉；
+如果更新到 `1.1.4` 后仍是两次，请彻底关闭这个 Safari 标签页再重新打开（不要只刷新），
+以排除旧的 `client.js` 缓存。
 
 ### iPhone 上切换大模型时页面放大、键盘自动弹出怎么办
 
@@ -364,7 +370,7 @@ iPhone 软键盘没有可用的 Shift 键，因此插件在 **iOS / iPadOS** 上
 ### 推荐：npm 官方命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.3 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.4 --registry=https://registry.npmjs.org/
 ```
 
 ### 使用 `@latest`
@@ -494,7 +500,8 @@ dsh plugin --profile web remove dsh-mobile-access
 - `1.1.0` — 回环监听自动局域网网关（macOS / Windows，HTTP + `/api/remote.mux` WebSocket）。
 - `1.1.1` — iPhone / iPad 上模型选择页 16px 缩放守卫。
 - `1.1.2` — 打开模型选择时不自动弹键盘、不整体上移。
-- `1.1.3` — iPhone / iPad 上会话行第一次点击即可切换；当前 npm `latest`。
+- `1.1.4` — iPhone / iPad 上第一次点击直接切换会话，并在切换后自动收起左侧栏；当前 npm `latest`。
+- `1.1.3` — 首次尝试临时移除会话行 `tabindex`。
 
 ## 许可证
 

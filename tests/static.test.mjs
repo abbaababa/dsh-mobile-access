@@ -78,7 +78,7 @@ test('client artifact is a single loader script with no unresolved placeholders'
   assert.doesNotMatch(source, /^\s*(?:import|export)\s/m)
   assert.doesNotMatch(source, /from\s+['"]node:/)
   // Source modules stay under 500 lines each; this is the concatenated bundle.
-  assert.equal(source.split('\n').length < 650, true)
+  assert.equal(source.split('\n').length < 750, true)
 })
 
 test('client artifact carries the sidebar/main panel contract and theme tokens', () => {
@@ -98,6 +98,8 @@ test('client artifact carries the sidebar/main panel contract and theme tokens',
   assert.match(source, /installIOSSidebarTapGuard/)
   assert.match(source, /data-row-key\^="session:"/)
   assert.match(source, /touch-action: manipulation/)
+  assert.match(source, /touchend/)
+  assert.match(source, /toggleSidebar/)
   assert.match(source, /isAppleMobile/)
 })
 

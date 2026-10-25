@@ -1,12 +1,13 @@
 # Acceptance gates
 
-Status as of 2026-10-25 09:52 +08:00: **G1–G6 PASS**, **G4.1 PASS** (npm
-`1.1.3` installed; `1.1.1`–`1.1.3` are client-only over `1.1.0`, so a browser
+Status as of 2026-10-25 10:09 +08:00: **G1–G6 PASS**, **G4.1 PASS** (npm
+`1.1.4` installed; `1.1.1`–`1.1.4` are client-only over `1.1.0`, so a browser
 refresh is enough and no host restart is required), **G7 PARTIAL**, **G8
 PARTIAL** (G8.1 items 1–3 confirmed by the user on the physical iPhone; G8.2
 model-selector zoom and keyboard behavior pending after the `1.1.2` refresh;
-G8.3 one-tap sidebar session switching pending after the `1.1.3` refresh;
-other items pending), **G9 baseline PASS** (interactive Mac checklist pending),
+G8.3 one-tap + auto-collapse pending after the `1.1.4` refresh; the `1.1.3`
+`tabIndex`-only attempt did not pass the user's physical-iPhone retest; other
+items pending), **G9 baseline PASS** (interactive Mac checklist pending),
 **G10 PARTIAL** (macOS loopback gateway passed against an isolated DSH;
 Windows 10/11 pending), **G-R PASS** (no agent restart). G6 is confirmed by the
 user on the physical iPhone 16 Pro Max (iOS 27) after the Host-pin + nonce fix;
@@ -15,7 +16,7 @@ still pending. The live profile was migrated from the local link install to the
 npm package `dsh-mobile-access@1.0.1` on 2026-10-24 20:22 +08:00, then to
 `1.0.3` at 20:53 +08:00, then to `1.1.0` at 21:44 +08:00, then to `1.1.1` at
 22:05 +08:00, then to `1.1.2` at 2026-10-25 09:26 +08:00, then to `1.1.3` at
-2026-10-25 09:52 +08:00; the restarted live process is PID 83750, still bind-only on `192.168.71.37:3080` (no 3081 listener,
+2026-10-25 09:52 +08:00, then to `1.1.4` at 2026-10-25 10:09 +08:00; the restarted live process is PID 83750, still bind-only on `192.168.71.37:3080` (no 3081 listener,
 correct for a LAN-bound core). `PENDING`/`PARTIAL` means not fully executed.
 Never replace either with `PASS` without a command and an observed result.
 
@@ -161,7 +162,8 @@ Manual, on the physical iPhone 16 Pro Max (iOS 27):
 - [ ] Settings, model selection, history, file attachment/photo where available.
 - [ ] **G8.3** Expand the sidebar so session titles are visible, then tap a
       different session title once; the conversation must switch on that first
-      tap. Mac must still switch on one mouse click.
+      tap and the narrow sidebar must auto-collapse afterward. Mac must still
+      switch on one mouse click and keep its sidebar state.
 - [ ] **G8.2** Tap the bottom-right model switcher: the page must not zoom;
       the model menu must stay fully visible; focusing its search field must not
       zoom either; model selection must complete. Mac must remain unchanged.
@@ -287,15 +289,15 @@ macOS 27 evidence (2026-10-24 21:52 +08:00, isolated profile
 | G1 | 2026-10-24 18:48 +08:00 | lead | `npm run verify` | `[verify] typecheck` / `[build] typecheck PASS`; `node --check` all root artifacts exit 0 | PASS |
 | G2 | 2026-10-24 18:48 +08:00 | lead | `npm run verify` | `[build] OK (index.js, service.js, routes.js, html.js, types.js, client.js)` | PASS |
 | G3 | 2026-10-25 09:27 +08:00 | lead | `node --test tests/*.test.mjs` | 32 tests, 32 pass, 0 fail | PASS |
-| G4 | 2026-10-25 09:27 +08:00 | lead | `npm pack --dry-run` | 14 files, 36.7 kB tarball, allowlist only | PASS |
-| G4.1 | 2026-10-25 09:52 +08:00 | lead + user | official `dsh plugin` on live profile | dependency `1.1.3` (npm, not `link:`); installed manifest `1.1.3` with `gateway.js` and the sidebar tap guard; `dsh.profile.bundles` still ends with `dsh-mobile-access`; no existing dependency version changed; `1.1.3` is client-only over `1.1.0`, browser refresh required, host process PID 83750 unchanged | PASS (installed) |
+| G4 | 2026-10-25 10:09 +08:00 | lead | `npm pack --dry-run` | 14 files, 38.3 kB tarball, allowlist only | PASS |
+| G4.1 | 2026-10-25 10:09 +08:00 | lead + user | official `dsh plugin` on live profile | dependency `1.1.4` (npm, not `link:`); installed manifest `1.1.4` with `gateway.js` and the synthesized-click sidebar guard; `dsh.profile.bundles` still ends with `dsh-mobile-access`; no existing dependency version changed; `1.1.4` is client-only over `1.1.0`, browser refresh required, host process PID 83750 unchanged | PASS (installed) |
 | G5 | 2026-10-24 20:23 +08:00 | lead | `curl` live routes | `/m` 200 with `dsh-ma-pair` cookie + hidden nonce; state 401; `/` 401; POST with nonce + wrong code 200 “配对码不正确”; forged Host 403 | PASS |
 | G6 | 2026-10-24 19:30 +08:00 | lead + user | live `/m` nonce probes + physical iPhone | GET 200 with `dsh-ma-pair` cookie + 36-hex hidden nonce; POST without nonce 403; foreign Host 403; user confirmed the 8-digit code was accepted on the physical iPhone 16 Pro Max (iOS 27) and pairing succeeded, with no launch token in the URL. | PASS |
 | G7 | PARTIAL | lead + user | live owner state | The Mac panel displayed the live code, URL, and countdown, which exercises the owner-only `GET /api/mobile-access/state` through the browser session; a separate live `POST /rotate` observation is still pending | PARTIAL |
 | G8 | PARTIAL | user | physical iPhone checklist | Pairing PASS; full SPA entry and remaining functional items in the G8 checklist not yet evidenced | PARTIAL |
-| G8.1 | PARTIAL | user | iPhone Return-newline checklist | Client bundle npm `1.0.3` was installed when the user confirmed on the physical iPhone that the built-in Return key inserts a line break and does not send; npm `1.1.2` is now installed, client-only after a refresh. Items 4–8 (send-button preservation, menu, IME, Mac regression) not individually evidenced. | PARTIAL |
+| G8.1 | PARTIAL | user | iPhone Return-newline checklist | Client bundle npm `1.0.3` was installed when the user confirmed on the physical iPhone that the built-in Return key inserts a line break and does not send; npm `1.1.4` is now installed, client-only after a refresh. Items 4–8 (send-button preservation, menu, IME, Mac regression) not individually evidenced. | PARTIAL |
 | G8.2 | PENDING | user | iPhone model-switcher zoom/keyboard checklist | `1.1.2` client-only guard installed; 32/32 tests pass; physical iPhone test after refresh pending: no auto keyboard, no upward shift, deliberate search tap opens keyboard, full model list usable. | PENDING |
-| G8.3 | PENDING | user | iPhone one-tap sidebar session switch | `1.1.3` removes `tabIndex` from a `[data-row-key^="session:"]` row during touch (restores after 400 ms) and adds `touch-action: manipulation`; 32/32 tests pass; physical iPhone test after refresh pending: expanded sidebar, first tap on another session switches. | PENDING |
+| G8.3 | PENDING | user | iPhone one-tap + auto-collapse sidebar switch | `1.1.4` synthesizes the session-row click on `touchend`, suppresses the duplicate native click, and collapses the sidebar after activation; `1.1.3`'s `tabIndex`-only approach failed the user's retest. 32/32 tests pass; physical iPhone test after a full tab close/reopen pending: expanded sidebar, first tap on another session switches, then the sidebar collapses. | PENDING |
 | G9 | 2026-10-24 21:50 +08:00 | lead | baseline + diff after restart | `/` 401, `/api/health` 401, `/m` 200 with nonce; only listener `192.0.2.10:3080` (PID 83750), no 3081 (LAN-bound core correctly needs no gateway); profile patch unchanged; existing sidebar/main occupants unchanged; live npm install did not remove any registered slot; interactive Mac checklist pending | PASS (baseline) |
 | G10 | 2026-10-24 21:52 +08:00 | lead | isolated loopback DSH | `127.0.0.1:3090` + gateway `*:3081`; state `loopback=true`, gateway running on `192.0.2.10:3081`; `/m` 200 nonce; code+nonce POST 303; gateway `/` and state 200; `/api/remote.mux` WebSocket opened; Windows 10/11 pending | PARTIAL (macOS PASS) |
 | G-R | 2026-10-24 18:43 +08:00 | lead | install result | `application: applied`, no restart requested or performed; no restart command run | PASS |

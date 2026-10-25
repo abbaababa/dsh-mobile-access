@@ -192,7 +192,7 @@ const STYLES = __PANEL_CSS__
 function factory(require: (id: string) => unknown): ClientModule {
   React = require('react') as ReactRuntime
   return {
-    inject: ['slots', 'locale'],
+    inject: ['slots', 'locale', 'layout'],
     apply(ctx: ClientContext): void {
       ctx.effect(() => {
         const cleanups: Array<() => void> = []
@@ -248,7 +248,7 @@ function factory(require: (id: string) => unknown): ClientModule {
           ctx.logger?.warn?.(`[mobile-access] iOS model keyboard guard unavailable: ${String(error)}`)
         }
         try {
-          cleanups.push(installIOSSidebarTapGuard())
+          cleanups.push(installIOSSidebarTapGuard(ctx.layout))
         } catch (error) {
           ctx.logger?.warn?.(`[mobile-access] iOS sidebar tap guard unavailable: ${String(error)}`)
         }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.4 — 2026-10-25
+
+- Make iPhone/iPad session switching reliably one-tap: on `touchend` the
+  plugin synthesizes the session row's click, suppresses the duplicate native
+  click, and collapses the narrow sidebar after the switch. This replaces the
+  `1.1.3` approach that only removed `tabindex` and still required two taps on
+  some iOS Safari versions. The change is installed only on Apple mobile
+  devices; Mac and keyboard users are untouched. 32/32 tests pass.
+
 ## 1.1.3 — 2026-10-25
 
 - Make the first tap on an iPhone/iPad session row activate that session.

@@ -23,8 +23,13 @@ interface LocaleService {
   subscribe(listener: () => void): () => void
 }
 
+interface LayoutService {
+  toggleSidebar(): void
+}
+
 interface ClientContext {
   readonly slots: SlotService
+  readonly layout?: LayoutService
   readonly locale?: LocaleService
   effect(execute: () => void | (() => void), label?: string): void
   readonly logger?: {
@@ -248,31 +253,41 @@ function installIOSInputZoomGuard(): () => void {
 }
 
 /**
- * The official model menu can move focus into its search field while it opens.
- * On iPhone that opens the software keyboard and shifts the fixed-position menu
- * above the visible viewport. Suppress only programmatic search-box focus until
- * the user deliberately taps that field; blur a focused composer control before
- * any composer menu opens. Native taps still focus normally, and Mac is untouched.
- */
-/**
  * Safari treats a touch on a focusable, non-button row as a focus step: the
  * first tap focuses the row and only the second tap reaches its click handler.
  * Official session rows are `role="treeitem"` divs with `tabIndex={0}`, so
  * switching sessions on iPhone takes two taps. Remove that one attribute for
- * the duration of the tap on iOS only; React restores it on the next render and
- * this hook restores it after a short delay, leaving Mac and keyboard access
- * untouched. `touch-action: manipulation` is also applied in the iOS stylesheet
- * to avoid the legacy double-tap-zoom delay.
+ * the duration of the tap, activate the row on the first tap ourselves, and
+ * collapse the narrow sidebar after the switch. Mac and keyboard users are
+ * untouched; `touch-action: manipulation` in the iOS stylesheet removes the
+ * legacy double-tap-zoom delay.
  */
-function installIOSSidebarTapGuard(): () => void {
+function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
   if (!isAppleMobile()) return () => undefined
   const doc = document
   const timers = new Set<number>()
+  let pending: { row: HTMLElement; x: number; y: number; startedAt: number } | null = null
+  let syntheticClick = false
+  let suppressNativeClick = false
+  const isAction = (target: Element): boolean =>
+    target.closest('button, a, input, textarea, select, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="switch"], [data-row-actions]') !== null
+  const point = (event: Event): { x: number; y: number } | null => {
+    const touches = (event as TouchEvent).changedTouches ?? (event as TouchEvent).touches
+    const touch = touches?.[0]
+    return touch === undefined ? null : { x: touch.clientX, y: touch.clientY }
+  }
   const onTouchStart = (event: Event): void => {
     const target = event.target as Element | null
     if (target === null || typeof target.closest !== 'function') return
-    const row = target.closest('[data-row-key^="session:"]')
+    if (isAction(target)) {
+      pending = null
+      return
+    }
+    const row = target.closest('[data-row-key^="session:"]') as HTMLElement | null
     if (row === null) return
+    const at = point(event)
+    if (at === null) return
+    pending = { row, x: at.x, y: at.y, startedAt: Date.now() }
     const tabindex = row.getAttribute('tabindex')
     if (tabindex === null) return
     row.removeAttribute('tabindex')
@@ -282,14 +297,64 @@ function installIOSSidebarTapGuard(): () => void {
     }, 400)
     timers.add(timer)
   }
+  const onClickCapture = (event: Event): void => {
+    const target = event.target as Element | null
+    if (target === null || typeof target.closest !== 'function' || target.closest('[data-row-key^="session:"]') === null) return
+    if (syntheticClick) {
+      syntheticClick = false
+      suppressNativeClick = true
+      return
+    }
+    if (!suppressNativeClick) return
+    suppressNativeClick = false
+    event.preventDefault()
+    event.stopImmediatePropagation()
+  }
+  const onTouchEnd = (event: Event): void => {
+    if (pending === null) return
+    const { row, x, y, startedAt } = pending
+    pending = null
+    if (!row.isConnected) return
+    const at = point(event)
+    if (at === null) return
+    if (Math.hypot(at.x - x, at.y - y) > 10 || Date.now() - startedAt > 600) return
+    syntheticClick = true
+    row.click()
+    const timer = window.setTimeout(() => {
+      timers.delete(timer)
+      syntheticClick = false
+      suppressNativeClick = false
+    }, 500)
+    timers.add(timer)
+    if (window.innerWidth < 1024) {
+      window.setTimeout(() => {
+        try {
+          layout?.toggleSidebar()
+        } catch {
+          // Layout teardown must never break the row activation.
+        }
+      }, 0)
+    }
+  }
   doc.addEventListener('touchstart', onTouchStart, true)
+  doc.addEventListener('touchend', onTouchEnd, true)
+  doc.addEventListener('click', onClickCapture, true)
   return () => {
     doc.removeEventListener('touchstart', onTouchStart, true)
+    doc.removeEventListener('touchend', onTouchEnd, true)
+    doc.removeEventListener('click', onClickCapture, true)
     for (const timer of timers) window.clearTimeout(timer)
     timers.clear()
   }
 }
 
+/**
+ * The official model menu can move focus into its search field while it opens.
+ * On iPhone that opens the software keyboard and shifts the fixed-position menu
+ * above the visible viewport. Suppress only programmatic search-box focus until
+ * the user deliberately taps that field; blur a focused composer control before
+ * any composer menu opens. Native taps still focus normally, and Mac is untouched.
+ */
 function installIOSModelKeyboardGuard(): () => void {
   if (!isAppleMobile()) return () => undefined
   if (typeof HTMLInputElement === 'undefined') return () => undefined

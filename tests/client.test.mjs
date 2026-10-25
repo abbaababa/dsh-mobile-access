@@ -19,6 +19,7 @@ function harness() {
   const listeners = new Map()
   const execCommands = []
   const headChildren = []
+  let sidebarToggles = 0
 
   const React = {
     createElement(type, props, ...children) {
@@ -79,6 +80,10 @@ function harness() {
       if (options.name === 'sidebar.panellist') icon = component
       return () => undefined
     },
+  }
+
+  const layout = {
+    toggleSidebar() { sidebarToggles += 1 },
   }
 
   const context = {
@@ -185,7 +190,7 @@ function harness() {
   }
   context.HTMLInputElement = HTMLInputElement
   context.globalThis = context
-  return { context, errors, registrations, listeners, execCommands, headChildren, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
+  return { context, errors, registrations, listeners, execCommands, headChildren, layout, get sidebarToggles() { return sidebarToggles }, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
 }
 
 test('client bundle registers the sidebar entry and renders the panel without throwing', async () => {
@@ -199,12 +204,13 @@ test('client bundle registers the sidebar entry and renders the panel without th
     assert.equal(id, 'react')
     return h.React
   })
-  assert.deepEqual([...plugin.inject], ['slots', 'locale'])
+  assert.deepEqual([...plugin.inject], ['slots', 'locale', 'layout'])
 
   const effects = []
   plugin.apply({
     slots: h.slots,
     locale: h.locale,
+    layout: h.layout,
     effect(effect) { effects.push(effect()) },
     logger: { error: (message) => h.errors.push(message), warn: (message) => h.errors.push(message) },
   })
@@ -311,20 +317,30 @@ test('client bundle registers the sidebar entry and renders the panel without th
   assert.equal(typeof touchstart, 'function')
   const row = {
     attributes: { tabindex: '0' },
+    clickCount: 0,
     isConnected: true,
+    click() { this.clickCount += 1 },
     getAttribute(name) { return this.attributes[name] ?? null },
     setAttribute(name, value) { this.attributes[name] = value },
     removeAttribute(name) { delete this.attributes[name] },
     closest(selector) { return selector === '[data-row-key^="session:"]' ? this : null },
   }
-  touchstart({ target: row })
+  touchstart({ target: row, changedTouches: [{ clientX: 0, clientY: 0 }] })
   assert.equal(row.getAttribute('tabindex'), null, 'first tap must not be consumed by focus')
+  const touchend = h.listeners.get('touchend')
+  assert.equal(typeof touchend, 'function')
+  touchend({ changedTouches: [{ clientX: 0, clientY: 0 }] })
+  assert.equal(row.clickCount, 1, 'first tap must activate the session row exactly once')
+  await new Promise((resolve) => setTimeout(resolve, 10))
+  assert.equal(h.sidebarToggles, 1, 'the narrow sidebar must collapse after switching')
 
   for (const cleanup of effects.reverse()) cleanup()
   assert.equal(h.context.navigator.clipboard, undefined)
   assert.equal(h.listeners.has('keydown'), false)
   assert.equal(h.listeners.has('pointerdown'), false)
   assert.equal(h.listeners.has('touchstart'), false)
+  assert.equal(h.listeners.has('touchend'), false)
+  assert.equal(h.listeners.has('click'), false)
   assert.equal(h.headChildren.length, 0, 'zoom guard style must be removed on cleanup')
   const restored = new h.context.HTMLInputElement()
   restored.setAttribute('role', 'searchbox')
