@@ -20,6 +20,27 @@
 
 其他东西都不动：不改 DSH 核心、不改登录方式、不替换页面、不装后台服务、不拦截现有请求。
 
+## 安全吗？会偷看或上传我的文件吗？
+
+**结论：按 1.1.8 的源码和 npm 发布包检查，没有发现窃取文件、上传数据或远程控制的行为。**
+
+- **没有生产依赖**：`dependencies` 是空的；安装包只含运行所需的 JS、配置、图标和说明。
+- **没有危险能力**：服务端只用到 Node 自带的 `http`、`net`、`os` 和 Web Crypto；没有读文件的 `fs`、没有执行命令的 `child_process`、没有 `eval`。
+- **没有第三方服务器**：手机和电脑之间的配对、页面、WebSocket 只在你的局域网或你自己的 Tailscale 内；配对码和 Cookie 只发给这台 DSH。
+- **不主动读取或保存内容**：插件不读取聊天记录、不扫描文件；局域网网关只转发你主动发起的 HTTP/WebSocket 请求，不另存一份。
+- **自动检查结果**：`npm audit --omit=dev` 为 **0 个漏洞**；npm 已校验 1.1.8 发布包的 registry 签名；33 项自动测试和 Ubuntu/Windows CI 均通过。
+- **边界也要知道**：插件运行在 DSH 进程权限内；请只从 npm 安装固定版本，不要把 8 位配对码给不信任的人；在公共 Wi-Fi 下建议关闭网关或改用 Tailscale。任何软件都有供应链风险，锁定 `1.1.8` 比盲目使用 `@latest` 更稳妥。
+
+技术用户可以自己复核：
+
+```bash
+cd /path/to/dsh-mobile-access
+npm view dsh-mobile-access@1.1.8 dependencies
+npm audit --omit=dev
+npm audit signatures
+grep -RInE "child_process|exec\\(|eval\\(|https?://" src
+```
+
 ---
 
 ## English (US) — What This Is
