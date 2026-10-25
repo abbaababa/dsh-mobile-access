@@ -1,3 +1,21 @@
+## 1.1.6 — 2026-10-25
+
+- Add iOS/iPadOS horizontal sidebar swipes: right opens the collapsed rail,
+  left closes the expanded sidebar. The gesture is scoped to content, ignores
+  vertical scroll/editable/menu/code targets, avoids Safari edge navigation in
+  a normal tab, and never installs on Mac.
+- Add a swipe regression test and update the static client contract.
+
+## 1.1.5 — 2026-10-25
+
+- Allow the public `/m` pairing page through Tailscale Serve when the request
+  arrives from a loopback peer, carries a Tailscale identity header
+  (`tailscale-user-login` or `tailscale-user-name`), and its Host ends in
+  `.ts.net`. Direct loopback and DNS-rebinding protections remain unchanged.
+- `trustedHosts` in the live profile must include the current tailnet hostname
+  for the authenticated SPA/API; this is a profile config change, not a plugin
+  code change.
+
 # Changelog
 
 ## 1.1.4 — 2026-10-25

@@ -96,6 +96,7 @@ test('client artifact carries the sidebar/main panel contract and theme tokens',
   assert.match(source, /input\[role="searchbox"\]/)
   assert.match(source, /data-composer-card/)
   assert.match(source, /installIOSSidebarTapGuard/)
+  assert.match(source, /installIOSSidebarSwipeGuard/)
   assert.match(source, /data-row-key\^="session:"/)
   assert.match(source, /touch-action: manipulation/)
   assert.match(source, /touchend/)

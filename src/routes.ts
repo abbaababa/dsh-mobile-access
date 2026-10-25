@@ -146,7 +146,25 @@ function pairingHostAllowed(ctx: PluginContext, request: RequestLike): boolean {
   } catch {
     return false
   }
-  return isLoopbackHost(bare) || bare === expected
+  if (isLoopbackHost(bare) || bare === expected) return true
+  return isTailscaleServeRequest(request, bare)
+}
+
+/**
+ * Tailscale Serve terminates TLS and forwards to the loopback listener while
+ * preserving the public `*.ts.net` Host. Serve adds identity headers that a
+ * cross-site browser form cannot forge; requiring one plus a loopback peer
+ * keeps DNS-rebinding protection intact for direct loopback requests.
+ */
+function isTailscaleServeRequest(request: RequestLike, hostname: string): boolean {
+  if (!hostname.endsWith('.ts.net')) return false
+  const identity = firstHeader(request.headers, 'tailscale-user-login')
+    ?? firstHeader(request.headers, 'tailscale-user-name')
+  if (identity === undefined || identity.length === 0) return false
+  const remote = request.socket?.remoteAddress
+  if (remote === undefined) return false
+  const normalized = remote.startsWith('::ffff:') ? remote.slice(7) : remote
+  return isLoopbackHost(normalized)
 }
 
 function pairingNonce(): string {

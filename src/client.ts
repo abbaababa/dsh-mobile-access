@@ -252,6 +252,11 @@ function factory(require: (id: string) => unknown): ClientModule {
         } catch (error) {
           ctx.logger?.warn?.(`[mobile-access] iOS sidebar tap guard unavailable: ${String(error)}`)
         }
+        try {
+          cleanups.push(installIOSSidebarSwipeGuard(ctx.layout))
+        } catch (error) {
+          ctx.logger?.warn?.(`[mobile-access] iOS sidebar swipe guard unavailable: ${String(error)}`)
+        }
         return () => {
           for (const cleanup of cleanups.reverse()) {
             try {

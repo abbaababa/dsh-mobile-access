@@ -349,6 +349,63 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
 }
 
 /**
+ * Horizontal swipes on iPhone: right opens the left sidebar, left closes it.
+ * The gesture is limited to the content area and ignores vertical scrolling,
+ * editable controls, menus, code blocks and the right panel. On a normal Safari
+ * tab we stay 24px away from the screen edges so the system back/forward gesture
+ * keeps priority; an installed PWA has no such gesture, so edge starts are
+ * allowed there. Mac never installs this listener.
+ */
+function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
+  if (!isAppleMobile() || layout === undefined) return () => undefined
+  const doc = document
+  let pending: { x: number; y: number; startedAt: number } | null = null
+  const isBlocked = (target: Element): boolean =>
+    target.closest('input, textarea, select, [contenteditable="true"], [data-composer-card], pre, code, [role="slider"], [data-rightbar], [role="menu"], [role="listbox"], button, a, [role="button"]') !== null
+  const point = (event: Event): { x: number; y: number } | null => {
+    const touches = (event as TouchEvent).changedTouches ?? (event as TouchEvent).touches
+    const touch = touches?.[0]
+    return touch === undefined ? null : { x: touch.clientX, y: touch.clientY }
+  }
+  const onTouchStart = (event: Event): void => {
+    pending = null
+    const touches = (event as TouchEvent).touches
+    if (touches !== undefined && touches.length !== 1) return
+    const target = event.target as Element | null
+    if (target === null || typeof target.closest !== 'function' || isBlocked(target)) return
+    const at = point(event)
+    if (at === null) return
+    const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
+    if (!standalone && (at.x < 24 || at.x > window.innerWidth - 24)) return
+    pending = { x: at.x, y: at.y, startedAt: Date.now() }
+  }
+  const onTouchEnd = (event: Event): void => {
+    if (pending === null) return
+    const { x, y, startedAt } = pending
+    pending = null
+    if (Date.now() - startedAt > 800) return
+    const at = point(event)
+    if (at === null) return
+    const dx = at.x - x
+    const dy = at.y - y
+    if (Math.abs(dx) < 70 || Math.abs(dx) <= Math.abs(dy) * 1.5) return
+    const collapsed = doc.querySelector('[data-sidebar-collapsed]') !== null
+    if (dx > 0 ? !collapsed : collapsed) return
+    try {
+      layout.toggleSidebar()
+    } catch {
+      // Layout teardown must never break a gesture.
+    }
+  }
+  doc.addEventListener('touchstart', onTouchStart, true)
+  doc.addEventListener('touchend', onTouchEnd, true)
+  return () => {
+    doc.removeEventListener('touchstart', onTouchStart, true)
+    doc.removeEventListener('touchend', onTouchEnd, true)
+  }
+}
+
+/**
  * The official model menu can move focus into its search field while it opens.
  * On iPhone that opens the software keyboard and shifts the fixed-position menu
  * above the visible viewport. Suppress only programmatic search-box focus until

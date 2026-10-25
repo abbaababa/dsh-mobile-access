@@ -241,6 +241,37 @@ test('untrusted hosts are rejected before the page is rendered', async () => {
   assert.match(res.body, /未通过 Host 校验/)
 })
 
+test('Tailscale Serve host is accepted only with identity and a loopback peer', async () => {
+  const tailnetHost = 'openmacbook-pro-1.tailcc0cfb.ts.net'
+  const accepted = response()
+  await createPairingHandler(context().ctx, service())(
+    request({
+      headers: { host: tailnetHost, 'tailscale-user-login': 'owner@example.com' },
+      remoteAddress: '127.0.0.1',
+    }),
+    accepted,
+  )
+  assert.equal(accepted.statusCode, 200)
+  assert.match(accepted.body, /手机访问/)
+
+  const noIdentity = response()
+  await createPairingHandler(context().ctx, service())(
+    request({ headers: { host: tailnetHost }, remoteAddress: '127.0.0.1' }),
+    noIdentity,
+  )
+  assert.equal(noIdentity.statusCode, 403)
+
+  const nonLoopback = response()
+  await createPairingHandler(context().ctx, service())(
+    request({
+      headers: { host: tailnetHost, 'tailscale-user-login': 'owner@example.com' },
+      remoteAddress: '192.168.1.20',
+    }),
+    nonLoopback,
+  )
+  assert.equal(nonLoopback.statusCode, 403)
+})
+
 test('cookie mint failure is a generic 500 without a token', async () => {
   const { ctx } = context({
     authorizeIndex: (incoming, outgoing) => {

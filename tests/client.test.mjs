@@ -20,6 +20,12 @@ function harness() {
   const execCommands = []
   const headChildren = []
   let sidebarToggles = 0
+  let sidebarCollapsed = false
+  const emit = (type, event) => {
+    const entry = listeners.get(type)
+    const list = Array.isArray(entry) ? entry : entry === undefined ? [] : [entry]
+    for (const listener of [...list]) listener(event)
+  }
 
   const React = {
     createElement(type, props, ...children) {
@@ -130,9 +136,21 @@ function harness() {
           },
         }
       },
-      addEventListener(type, listener) { listeners.set(type, listener) },
-      removeEventListener(type) { listeners.delete(type) },
-      querySelector() { return null },
+      addEventListener(type, listener) {
+        const entry = listeners.get(type)
+        if (Array.isArray(entry)) entry.push(listener)
+        else listeners.set(type, entry === undefined ? [listener] : [entry, listener])
+      },
+      removeEventListener(type, listener) {
+        const entry = listeners.get(type)
+        if (!Array.isArray(entry)) return
+        const next = entry.filter((candidate) => candidate !== listener)
+        if (next.length === 0) listeners.delete(type)
+        else listeners.set(type, next)
+      },
+      querySelector(selector) {
+        return selector === '[data-sidebar-collapsed]' && sidebarCollapsed ? {} : null
+      },
       execCommand: (command, _show, value) => { execCommands.push([command, value]); return true },
     },
     fetch: async () => ({
@@ -190,7 +208,7 @@ function harness() {
   }
   context.HTMLInputElement = HTMLInputElement
   context.globalThis = context
-  return { context, errors, registrations, listeners, execCommands, headChildren, layout, get sidebarToggles() { return sidebarToggles }, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
+  return { context, errors, registrations, listeners, execCommands, headChildren, layout, emit, set sidebarCollapsed(value) { sidebarCollapsed = value }, get sidebarToggles() { return sidebarToggles }, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
 }
 
 test('client bundle registers the sidebar entry and renders the panel without throwing', async () => {
@@ -242,8 +260,7 @@ test('client bundle registers the sidebar entry and renders the panel without th
   assert.match(zoomGuard.textContent, /\[role="searchbox"\]/)
 
   // iOS Return must look like Shift+Enter to Lexical so the native newline wins.
-  const keydown = h.listeners.get('keydown')
-  assert.equal(typeof keydown, 'function')
+  const keydown = (event) => h.emit('keydown', event)
   let prevented = false
   const inComposer = {
     key: 'Enter',
@@ -287,8 +304,7 @@ test('client bundle registers the sidebar entry and renders the panel without th
 
   // A programmatic focus of the model search must not open the keyboard until
   // the user actually taps that search field.
-  const pointerdown = h.listeners.get('pointerdown')
-  assert.equal(typeof pointerdown, 'function')
+  const pointerdown = (event) => h.emit('pointerdown', event)
   const searchbox = new h.context.HTMLInputElement()
   searchbox.setAttribute('role', 'searchbox')
   searchbox.focus()
@@ -313,8 +329,7 @@ test('client bundle registers the sidebar entry and renders the panel without th
   // Safari focuses a clickable div carrying tabIndex before it dispatches click.
   // The iOS guard removes that attribute for the tap so the first tap switches
   // the session instead of only focusing the row.
-  const touchstart = h.listeners.get('touchstart')
-  assert.equal(typeof touchstart, 'function')
+  const touchstart = (event) => h.emit('touchstart', event)
   const row = {
     attributes: { tabindex: '0' },
     clickCount: 0,
@@ -327,12 +342,23 @@ test('client bundle registers the sidebar entry and renders the panel without th
   }
   touchstart({ target: row, changedTouches: [{ clientX: 0, clientY: 0 }] })
   assert.equal(row.getAttribute('tabindex'), null, 'first tap must not be consumed by focus')
-  const touchend = h.listeners.get('touchend')
-  assert.equal(typeof touchend, 'function')
+  const touchend = (event) => h.emit('touchend', event)
   touchend({ changedTouches: [{ clientX: 0, clientY: 0 }] })
   assert.equal(row.clickCount, 1, 'first tap must activate the session row exactly once')
   await new Promise((resolve) => setTimeout(resolve, 10))
   assert.equal(h.sidebarToggles, 1, 'the narrow sidebar must collapse after switching')
+
+  // A horizontal swipe toggles the sidebar: right opens a collapsed rail,
+  // left closes an expanded sidebar. The swipe target is outside controls.
+  const swipeTarget = { closest: () => null }
+  h.sidebarCollapsed = true
+  touchstart({ touches: [{ clientX: 100, clientY: 420 }], changedTouches: [{ clientX: 100, clientY: 420 }], target: swipeTarget })
+  touchend({ touches: [], changedTouches: [{ clientX: 220, clientY: 430 }] })
+  assert.equal(h.sidebarToggles, 2, 'right swipe must open the collapsed sidebar')
+  h.sidebarCollapsed = false
+  touchstart({ touches: [{ clientX: 300, clientY: 420 }], changedTouches: [{ clientX: 300, clientY: 420 }], target: swipeTarget })
+  touchend({ touches: [], changedTouches: [{ clientX: 180, clientY: 430 }] })
+  assert.equal(h.sidebarToggles, 3, 'left swipe must close the expanded sidebar')
 
   for (const cleanup of effects.reverse()) cleanup()
   assert.equal(h.context.navigator.clipboard, undefined)
