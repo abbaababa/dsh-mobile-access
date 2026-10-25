@@ -1,6 +1,6 @@
 {
   "name": "dsh-mobile-access",
-  "version": "1.1.7",
+  "version": "1.1.8",
   "description": "Independent DSH bundle that pairs iPhones and iPads with the official DeepSeek Harness Web GUI over the local network.",
   "type": "module",
   "license": "MIT",

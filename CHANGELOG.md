@@ -1,3 +1,10 @@
+## 1.1.8 — 2026-10-25
+
+- Dismiss the iPhone/iPad keyboard when a sidebar session switch happens.
+  Blur any still-focused composer and suppress a late programmatic composer
+  focus for 800 ms, while a deliberate composer tap is still allowed.
+  The guard is iOS-only and leaves Mac/Windows desktop behavior unchanged.
+
 ## 1.1.7 — 2026-10-25
 
 - Change the iPhone sidebar closing gesture: a tap in the conversation content

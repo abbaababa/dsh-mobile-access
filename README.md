@@ -99,7 +99,7 @@ Windows 和 Mac 最需要额外注意的区别是：
 #### 第 2 步：复制下面这一条命令，粘贴，回车
 
 ```powershell
-dsh plugin --profile web add dsh-mobile-access@1.1.7 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
 ```
 
 这条命令只做三件事：
@@ -244,7 +244,7 @@ iPhone 打开「设置 → 无线局域网」，确认和电脑连的是同一�
 ### 第 2 步：在 Mac 终端或 Windows PowerShell 执行一条命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.7 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
 ```
 
 这条命令做三件事：
@@ -356,6 +356,14 @@ iOS Safari 会把第一次触摸先用去聚焦，第二次才派发 `click`。
 
 如果左侧栏仍然是窄窄的图标条，第一下是展开侧栏——这是官方布局，不是会话行的问题；
 展开后每个会话只需单击一次。
+
+### 切换会话后键盘不再自动弹出
+
+从 `1.1.8` 起，iPhone / iPad 上切换会话时，插件会先收起当前输入框的键盘：
+旧输入框如果还保持焦点，会立即失焦；会话切换后的 800 毫秒内，如果页面又尝试
+用程序方式把焦点塞回输入框，插件也会把它收起。只有你亲手点一下输入框，键盘才会
+再次出现。这样切换会话后不会莫名其妙弹出输入法，语音输入和正常打字都不受影响。
+Mac 和 Windows 桌面不安装这条 iOS 专属逻辑，行为保持原样。
 
 ### iPhone 上展开 / 收起左侧栏
 
@@ -553,7 +561,7 @@ iPhone 软键盘没有可用的 Shift 键，因此插件在 **iOS / iPadOS** 上
 ### 推荐：npm 官方命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.7 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
 ```
 
 ### 使用 `@latest`
@@ -683,7 +691,8 @@ dsh plugin --profile web remove dsh-mobile-access
 - `1.1.0` — 回环监听自动局域网网关（macOS / Windows，HTTP + `/api/remote.mux` WebSocket）。
 - `1.1.1` — iPhone / iPad 上模型选择页 16px 缩放守卫。
 - `1.1.2` — 打开模型选择时不自动弹键盘、不整体上移。
-- `1.1.7` — iPhone / iPad 上右滑展开左侧栏，点击内容区收起；当前 npm `latest`。
+- `1.1.8` — iPhone / iPad 上切换会话后不再自动弹出输入法键盘；当前 npm `latest`。
+- `1.1.7` — iPhone / iPad 上右滑展开左侧栏，点击内容区收起。
 - `1.1.6` — iPhone / iPad 上右滑展开、左滑收起左侧栏。
 - `1.1.5` — Tailscale Serve 经 HTTPS 访问时，允许带 Tailscale 身份头的 `*.ts.net` Host（仅限本机回环转发）。
 - `1.1.4` — iPhone / iPad 上第一次点击直接切换会话，并在切换后自动收起左侧栏。

@@ -343,13 +343,29 @@ test('client bundle registers the sidebar entry and renders the panel without th
     removeAttribute(name) { delete this.attributes[name] },
     closest(selector) { return selector === '[data-row-key^="session:"]' ? this : null },
   }
+  let sessionBlurred = false
+  h.context.document.activeElement = { blur() { sessionBlurred = true } }
   touchstart({ target: row, changedTouches: [{ clientX: 0, clientY: 0 }] })
   assert.equal(row.getAttribute('tabindex'), null, 'first tap must not be consumed by focus')
   const touchend = (event) => h.emit('touchend', event)
   touchend({ changedTouches: [{ clientX: 0, clientY: 0 }] })
+  assert.equal(sessionBlurred, true, 'switching a session must dismiss the open keyboard')
   assert.equal(row.clickCount, 1, 'first tap must activate the session row exactly once')
   await new Promise((resolve) => setTimeout(resolve, 10))
   assert.equal(h.sidebarToggles, 1, 'the narrow sidebar must collapse after switching')
+
+  // A late programmatic focus from the newly mounted conversation is suppressed,
+  // but a composer tap that the user deliberately makes is allowed through.
+  let composerBlurred = 0
+  const composer = {
+    closest(selector) { return selector.includes('[data-composer-input]') ? this : null },
+    blur() { composerBlurred += 1 },
+  }
+  h.emit('focusin', { target: composer })
+  assert.equal(composerBlurred, 1, 'post-switch composer focus must not open the keyboard')
+  touchstart({ target: composer, changedTouches: [{ clientX: 10, clientY: 10 }] })
+  h.emit('focusin', { target: composer })
+  assert.equal(composerBlurred, 1, 'a deliberate composer tap must keep native focus')
 
   // A horizontal swipe toggles the sidebar: right opens a collapsed rail,
   // left closes an expanded sidebar. The swipe target is outside controls.
@@ -379,6 +395,7 @@ test('client bundle registers the sidebar entry and renders the panel without th
   assert.equal(h.listeners.has('pointerdown'), false)
   assert.equal(h.listeners.has('touchstart'), false)
   assert.equal(h.listeners.has('touchend'), false)
+  assert.equal(h.listeners.has('focusin'), false)
   assert.equal(h.listeners.has('click'), false)
   assert.equal(h.headChildren.length, 0, 'zoom guard style must be removed on cleanup')
   const restored = new h.context.HTMLInputElement()

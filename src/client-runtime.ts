@@ -269,8 +269,38 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
   let pending: { row: HTMLElement; x: number; y: number; startedAt: number } | null = null
   let syntheticClick = false
   let suppressNativeClick = false
+  let suppressComposerFocusUntil = 0
+  let allowComposerFocus = false
+  let composerFocusTimer: number | undefined
   const isAction = (target: Element): boolean =>
     target.closest('button, a, input, textarea, select, [role="button"], [role="menuitem"], [role="menuitemradio"], [role="switch"], [data-row-actions]') !== null
+  const isComposer = (target: EventTarget | null): boolean => {
+    const element = target as Element | null
+    return element !== null
+      && typeof element.closest === 'function'
+      && element.closest('[data-composer-input], [data-composer-card] [contenteditable="true"]') !== null
+  }
+  const blurActive = (): void => {
+    const active = doc.activeElement as { blur?: () => void } | null
+    try {
+      active?.blur?.()
+    } catch {
+      // Focus may already have moved; a stale activeElement is harmless.
+    }
+  }
+  const onFocusIn = (event: Event): void => {
+    if (Date.now() >= suppressComposerFocusUntil) return
+    if (!isComposer(event.target)) return
+    if (allowComposerFocus) {
+      allowComposerFocus = false
+      return
+    }
+    try {
+      (event.target as HTMLElement).blur()
+    } catch {
+      // The element may be gone already; never break the page's focus flow.
+    }
+  }
   const point = (event: Event): { x: number; y: number } | null => {
     const touches = (event as TouchEvent).changedTouches ?? (event as TouchEvent).touches
     const touch = touches?.[0]
@@ -279,6 +309,14 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
   const onTouchStart = (event: Event): void => {
     const target = event.target as Element | null
     if (target === null || typeof target.closest !== 'function') return
+    if (isComposer(target)) {
+      allowComposerFocus = true
+      if (composerFocusTimer !== undefined) window.clearTimeout(composerFocusTimer)
+      composerFocusTimer = window.setTimeout(() => {
+        composerFocusTimer = undefined
+        allowComposerFocus = false
+      }, 500)
+    }
     if (isAction(target)) {
       pending = null
       return
@@ -318,6 +356,9 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
     const at = point(event)
     if (at === null) return
     if (Math.hypot(at.x - x, at.y - y) > 10 || Date.now() - startedAt > 600) return
+    suppressComposerFocusUntil = Date.now() + 800
+    allowComposerFocus = false
+    blurActive()
     syntheticClick = true
     row.click()
     const timer = window.setTimeout(() => {
@@ -339,10 +380,13 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
   doc.addEventListener('touchstart', onTouchStart, true)
   doc.addEventListener('touchend', onTouchEnd, true)
   doc.addEventListener('click', onClickCapture, true)
+  doc.addEventListener('focusin', onFocusIn, true)
   return () => {
     doc.removeEventListener('touchstart', onTouchStart, true)
     doc.removeEventListener('touchend', onTouchEnd, true)
     doc.removeEventListener('click', onClickCapture, true)
+    doc.removeEventListener('focusin', onFocusIn, true)
+    if (composerFocusTimer !== undefined) window.clearTimeout(composerFocusTimer)
     for (const timer of timers) window.clearTimeout(timer)
     timers.clear()
   }
