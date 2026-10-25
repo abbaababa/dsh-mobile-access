@@ -41,7 +41,7 @@
   "scripts": {
     "build": "node scripts/build.mjs",
     "typecheck": "node scripts/build.mjs --check",
-    "test": "node scripts/build.mjs && node --test tests/*.test.mjs",
+    "test": "node scripts/build.mjs && node --test tests",
     "verify": "bash scripts/verify.sh"
   },
   "dsh": {
