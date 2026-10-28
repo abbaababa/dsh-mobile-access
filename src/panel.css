@@ -1,8 +1,14 @@
 .dsh-ma{height:100%;min-height:100%;overflow:auto;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111827)}
+/* The host theme is an attribute on <body> (verified in dsh-client-ui-theme:
+   body[data-ds-dark-theme]), so scope UA colors to it instead of the OS setting. */
+body[data-ds-dark-theme] .dsh-ma{color-scheme:dark}
+body:not([data-ds-dark-theme]) .dsh-ma{color-scheme:light}
 .dsh-ma *{box-sizing:border-box}
 .dsh-ma-inner{width:100%;max-width:860px;margin:0 auto;padding:clamp(18px,4vw,36px);display:flex;flex-direction:column;gap:14px}
 .dsh-ma-head{display:flex;align-items:center;gap:14px;margin-bottom:4px}
-.dsh-ma-mark{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:14px;background:var(--dsw-alias-brand-primary,#2f5bea);color:#fff;font:800 21px/1 -apple-system,BlinkMacSystemFont,sans-serif}
+/* brand-primary is an inverting ink token (#0f1115 light / #f9fafb dark): its foreground must
+   invert with it, otherwise dark mode renders #fff on #f9fafb (1.05:1, invisible text). */
+.dsh-ma-mark{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border-radius:14px;background:var(--dsw-alias-brand-primary,#2f5bea);color:var(--dsw-alias-label-primary-foreground,#fff);font:800 21px/1 -apple-system,BlinkMacSystemFont,sans-serif}
 .dsh-ma-head h1{margin:0 0 3px;font-size:24px;line-height:1.2;letter-spacing:-.02em}
 .dsh-ma-head p{margin:0;color:var(--dsw-alias-label-secondary,#5f6b7a);font-size:14px;line-height:1.5}
 .dsh-ma-card{padding:16px;border:1px solid var(--dsw-alias-border-l2,#dfe4ec);border-radius:16px;background:var(--dsw-alias-bg-layer-1,#f8fafc)}
@@ -24,7 +30,9 @@
 .dsh-ma-pill.is-bad .dsh-ma-dot{background:var(--dsw-alias-state-error-primary,#b42318)}
 .dsh-ma-actions{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0}
 .dsh-ma-button{display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:8px 13px;border:1px solid var(--dsw-alias-border-l2,#d5dbe5);border-radius:10px;background:var(--dsw-alias-bg-base,#fff);color:var(--dsw-alias-label-primary,#111827);font:650 13px/1.2 -apple-system,BlinkMacSystemFont,sans-serif;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.dsh-ma-button.primary{border-color:var(--dsw-alias-brand-primary,#2f5bea);background:var(--dsw-alias-brand-primary,#2f5bea);color:#fff}
+/* Same pairing rule as .dsh-ma-mark; this is the host's own primary-button contract
+   (button-primary-fill + label-primary-foreground flip together in both themes). */
+.dsh-ma-button.primary{border-color:var(--dsw-alias-brand-primary,#2f5bea);background:var(--dsw-alias-brand-primary,#2f5bea);color:var(--dsw-alias-label-primary-foreground,#fff)}
 .dsh-ma-button:hover:not(:disabled){border-color:var(--dsw-alias-brand-primary,#2f5bea)}
 .dsh-ma-button:disabled{opacity:.55;cursor:not-allowed}
 .dsh-ma-button:focus-visible{outline:2px solid var(--dsw-alias-brand-primary,#2f5bea);outline-offset:2px}

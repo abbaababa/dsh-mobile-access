@@ -1,13 +1,14 @@
 # Acceptance gates
 
-Status as of 2026-10-25 12:20 +08:00: **G1–G6 PASS**, **G4.1 PASS** (npm
-`1.1.8` installed; `1.1.1`–`1.1.8` are client-only over `1.1.0`, so a browser
+Status as of 2026-10-28 12:45 +08:00: **G1–G6 PASS**, **G4.1 PASS** (npm
+`1.1.9` installed; `1.1.1`–`1.1.9` are client-only over `1.1.0`, so a browser
 refresh or tab reopen is enough and no host restart is required), **G7
 PARTIAL**, **G8 PARTIAL** (G8.1 items 1–3 confirmed by the user on the physical
 iPhone; G8.2 model-selector zoom/keyboard remains pending; G8.3 one-tap +
 auto-collapse was confirmed by the user's “成功了” after `1.1.4`; G8.4 swipe
 open + content-tap close is new in `1.1.7` and pending; G8.5 session-switch
-keyboard dismissal is new in `1.1.8` and pending), **G9 baseline PASS**
+keyboard dismissal is new in `1.1.8` and pending; G8.6 dark-mode white-block
+fix is new in `1.1.9` and pending physical confirmation), **G9 baseline PASS**
 (interactive Mac checklist pending), **G10 PARTIAL** (macOS loopback gateway
 passed against an isolated DSH; Windows 10/11 pending), **G-R PASS** (no agent
 restart). G6 is confirmed by the user on the physical iPhone 16 Pro Max
@@ -168,6 +169,11 @@ Manual, on the physical iPhone 16 Pro Max (iOS 27):
       once. The conversation must switch, the keyboard must close, and no
       keyboard may pop back up until you deliberately tap the composer.
       Mac must still keep its normal focus behavior.
+- [ ] **G8.6** On iPhone/iPad in dark mode, open the Mobile Access panel. The
+      `D` mark and the primary copy button must show readable dark text on the
+      host's light primary surface; no blank white-on-white block may remain.
+      Switch DSH to light mode: the same controls must still be readable and
+      the panel must keep its normal light appearance. Mac must be unchanged.
 - [ ] **G8.2** Tap the bottom-right model switcher: the page must not zoom;
       the model menu must stay fully visible; focusing its search field must not
       zoom either; model selection must complete. Mac must remain unchanged.
@@ -228,6 +234,36 @@ host process PID 83750 is unchanged, so only a browser refresh is needed.
 
 Platform limits (not failures): desktop drag-and-drop, unrestricted filesystem
 downloads, background execution, secure-context-only APIs.
+
+## G8.6 — iPhone dark-mode panel contrast
+
+Status 2026-10-28 12:45 +08:00: **PENDING** physical-device confirmation for
+`1.1.9`. The fix is client-only and changes styles only:
+
+- the host's `--dsw-alias-brand-primary` is an inverting ink token
+  (`#0f1115` in light, `#f9fafb` in dark), not a brand fill;
+- the panel's `D` mark and `.dsh-ma-button.primary` now use the paired
+  `--dsw-alias-label-primary-foreground` token instead of `color:#fff`;
+  in dark mode the expected pair is background `rgb(249, 250, 251)` and text
+  `rgb(15, 17, 21)`, a measured 18.08:1 contrast;
+- `color-scheme` follows the host attribute `body[data-ds-dark-theme]`, not the
+  operating-system setting; light mode resolves to the same `#fff` foreground
+  and is visually unchanged.
+
+Pass requires, after a full tab close/reopen on the physical iPhone 16 Pro Max
+(iOS 27) in dark mode:
+
+1. The `D` mark is a readable dark letter on the light tile, not a blank white
+   square;
+2. The primary copy button shows readable dark text, not a blank white pill;
+3. Switching DSH to light mode keeps both controls readable and does not alter
+   the light panel;
+4. Mac dark/light appearance is unchanged.
+
+Automated evidence: 35/35 tests pass; `npm run verify` PASS; the built
+`client.js` contains two `--dsw-alias-label-primary-foreground` uses and zero
+`color:#fff`. Expected in dark mode: computed `color: rgb(15, 17, 21)` on
+`background-color: rgb(249, 250, 251)`.
 
 ## G9 — Mac zero-regression
 
@@ -292,9 +328,9 @@ macOS 27 evidence (2026-10-24 21:52 +08:00, isolated profile
 |---|---|---|---|---|---|
 | G1 | 2026-10-24 18:48 +08:00 | lead | `npm run verify` | `[verify] typecheck` / `[build] typecheck PASS`; `node --check` all root artifacts exit 0 | PASS |
 | G2 | 2026-10-24 18:48 +08:00 | lead | `npm run verify` | `[build] OK (index.js, service.js, routes.js, html.js, types.js, client.js)` | PASS |
-| G3 | 2026-10-25 09:27 +08:00 | lead | `node --test tests/*.test.mjs` | 32 tests, 32 pass, 0 fail | PASS |
-| G4 | 2026-10-25 12:19 +08:00 | lead | `npm pack --dry-run` | 14 files, 43.3 kB tarball, allowlist only | PASS |
-| G4.1 | 2026-10-25 12:19 +08:00 | lead | official `dsh plugin` on live profile | dependency `1.1.8` (npm, not `link:`); installed manifest `1.1.8` with `gateway.js`, one-tap sidebar guard, right-swipe guard, content-tap collapse, and session-switch keyboard dismissal; `dsh.profile.bundles` still ends with `dsh-mobile-access`; no existing dependency version changed; `1.1.8` is client-only over `1.1.0`, full tab close/reopen required, host process PID 94233 unchanged | PASS (installed) |
+| G3 | 2026-10-28 12:43 +08:00 | lead | `npm run verify` | 35 tests, 35 pass, 0 fail | PASS |
+| G4 | 2026-10-28 12:43 +08:00 | lead | `npm pack --dry-run` | 15 files, 51.0 kB tarball, allowlist only | PASS |
+| G4.1 | 2026-10-28 12:42 +08:00 | lead | official `dsh plugin` on live profile | dependency `1.1.9` (npm, not `link:`); installed manifest `1.1.9`; `dsh.profile.bundles` still ends with `dsh-mobile-access`; no existing dependency version changed; `1.1.9` is client-only over `1.1.0`, full tab close/reopen required, host process PID 2511 unchanged; installed `client.js` has two foreground-token uses and zero `color:#fff` | PASS (installed) |
 | G5 | 2026-10-24 20:23 +08:00 | lead | `curl` live routes | `/m` 200 with `dsh-ma-pair` cookie + hidden nonce; state 401; `/` 401; POST with nonce + wrong code 200 “配对码不正确”; forged Host 403 | PASS |
 | G6 | 2026-10-24 19:30 +08:00 | lead + user | live `/m` nonce probes + physical iPhone | GET 200 with `dsh-ma-pair` cookie + 36-hex hidden nonce; POST without nonce 403; foreign Host 403; user confirmed the 8-digit code was accepted on the physical iPhone 16 Pro Max (iOS 27) and pairing succeeded, with no launch token in the URL. | PASS |
 | G7 | PARTIAL | lead + user | live owner state | The Mac panel displayed the live code, URL, and countdown, which exercises the owner-only `GET /api/mobile-access/state` through the browser session; a separate live `POST /rotate` observation is still pending | PARTIAL |
@@ -304,7 +340,8 @@ macOS 27 evidence (2026-10-24 21:52 +08:00, isolated profile
 | G8.3 | PASS | user | iPhone one-tap + auto-collapse sidebar switch | `1.1.4` synthesizes the session-row click on `touchend`, suppresses the duplicate native click, and collapses the sidebar after activation; `1.1.3`'s `tabIndex`-only approach failed the user's retest. 32/32 tests pass; user confirmed success after `1.1.4` on the physical iPhone. | PASS |
 | G8.4 | PENDING | user | iPhone swipe open + content-tap close | `1.1.8` keeps the iOS-only right swipe to open a collapsed sidebar and the content tap to close it; sidebar column, controls, links, code, session rows, menus and right panel are ignored. 33/33 tests pass; physical iPhone confirmation pending after a full tab close/reopen. | PENDING |
 | G8.5 | PENDING | user | iPhone session-switch keyboard dismissal | `1.1.8` blurs a still-focused composer on session switch and suppresses a late programmatic composer focus for 800 ms; a deliberate composer tap still opens the keyboard. 33/33 tests pass; physical iPhone confirmation pending after a full tab close/reopen. Mac is untouched. | PENDING |
-| G9 | 2026-10-25 12:19 +08:00 | lead | baseline + diff after 1.1.8 install | `/` 401; `/m` 200; only listener `127.0.0.1:3080` (PID 94233), no 3081 for the loopback core; installed manifest 1.1.8; profile bundle list unchanged; existing sidebar/main occupants unchanged; interactive Mac checklist pending | PASS (baseline) |
+| G8.6 | PENDING | user | iPhone dark-mode panel contrast | `1.1.9` pairs the inverting brand fill with `--dsw-alias-label-primary-foreground`; dark expected `rgb(249,250,251)` background and `rgb(15,17,21)` text (18.08:1), no blank white-on-white mark/button. 35/35 tests pass; physical iPhone dark-mode confirmation pending after a full tab close/reopen. | PENDING |
+| G9 | 2026-10-28 12:42 +08:00 | lead | baseline + diff after 1.1.9 install | `/` 401; `/m` 200 (nonce cookie + hidden nonce); only listener `127.0.0.1:3080` (PID 2511), no 3081 for the loopback core; installed manifest 1.1.9; profile bundle list unchanged; existing sidebar/main occupants unchanged; interactive Mac checklist pending | PASS (baseline) |
 | G10 | 2026-10-24 21:52 +08:00 | lead | isolated loopback DSH | `127.0.0.1:3090` + gateway `*:3081`; state `loopback=true`, gateway running on `192.0.2.10:3081`; `/m` 200 nonce; code+nonce POST 303; gateway `/` and state 200; `/api/remote.mux` WebSocket opened; Windows 10/11 pending | PARTIAL (macOS PASS) |
 | G-R | 2026-10-24 18:43 +08:00 | lead | install result | `application: applied`, no restart requested or performed; no restart command run | PASS |
 

@@ -1,3 +1,16 @@
+## 1.1.9 — 2026-10-28
+
+- Fix the iPhone/iPad dark-mode white blocks in the Mobile Access panel. The
+  host's `--dsw-alias-brand-primary` is an inverting ink token (`#0f1115` in
+  light, `#f9fafb` in dark), not a brand fill. The mark and primary copy button
+  used it as a background while forcing `color:#fff`, producing white-on-white
+  1.05:1 text. Both now use the paired
+  `--dsw-alias-label-primary-foreground` token (18.08:1 in dark), and
+  `color-scheme` follows the host's `body[data-ds-dark-theme]` attribute.
+- Add static regression assertions that every brand-filled surface is paired
+  with its foreground token and that no `color:#fff` remains in the panel.
+  Light mode is unchanged (the light foreground token resolves to `#fff`).
+
 ## 1.1.8 — 2026-10-25
 
 - Dismiss the iPhone/iPad keyboard when a sidebar session switch happens.

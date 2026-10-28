@@ -37,20 +37,20 @@ app, jailbreak the phone, or expose DSH to the public internet.
 
 ## Is it safe? Does it steal files?
 
-**Short answer: the 1.1.8 source and npm package show no file theft, data upload, or remote-control behavior.**
+**Short answer: the 1.1.9 source and npm package show no file theft, data upload, or remote-control behavior.**
 
 - **No production dependencies.** The package contains only the runtime JS, config, icon, and docs.
 - **No dangerous capabilities.** The host uses only Node’s built-in `http`, `net`, `os`, and Web Crypto. It does not import `fs` to read files, `child_process` to run commands, or `eval`.
 - **No third-party server.** Pairing, pages, and WebSockets stay on your LAN or your own Tailscale network. The code and cookie go only to this DSH instance.
 - **No content collection.** The plugin does not read chats or scan files. The LAN gateway only forwards HTTP/WebSocket requests you make, like a small local router; it does not store a copy.
-- **Checks:** `npm audit --omit=dev` reports **0 vulnerabilities**; npm verifies the 1.1.8 registry signature; 33 tests and Ubuntu/Windows CI pass.
-- **Limits:** a DSH plugin runs with the DSH process’s permissions. Install the exact npm version, keep the 8-digit code private, and on public Wi-Fi prefer Tailscale or turn the gateway off. Any software has supply-chain risk; pinning `1.1.8` is safer than `@latest`.
+- **Checks:** `npm audit --omit=dev` reports **0 vulnerabilities**; npm verifies the 1.1.9 registry signature; 35 tests and Ubuntu/Windows CI pass.
+- **Limits:** a DSH plugin runs with the DSH process’s permissions. Install the exact npm version, keep the 8-digit code private, and on public Wi-Fi prefer Tailscale or turn the gateway off. Any software has supply-chain risk; pinning `1.1.9` is safer than `@latest`.
 
 You can verify it yourself:
 
 ```bash
 cd /path/to/dsh-mobile-access
-npm view dsh-mobile-access@1.1.8 dependencies
+npm view dsh-mobile-access@1.1.9 dependencies
 npm audit --omit=dev
 npm audit signatures
 grep -RInE "child_process|exec\\(|eval\\(|https?://" src
@@ -106,7 +106,7 @@ Open **Terminal** (`Command + Space`, type `Terminal`, press Return), paste this
 one line, and press Return:
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
 ```
 
 ### Windows 10/11
@@ -116,7 +116,7 @@ PowerShell — **no administrator mode needed**), paste the same line, and press
 Enter:
 
 ```powershell
-dsh plugin --profile web add dsh-mobile-access@1.1.8 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
 ```
 
 What the command does:
@@ -372,10 +372,11 @@ CI badge and workflow:
 
 ## Version
 
-Current version: **1.1.8**.
+Current version: **1.1.9**.
 
 Recent highlights:
 
+- `1.1.9` — fix invisible white-on-white mark and primary copy button in iPhone/iPad dark mode by pairing the inverting brand fill with the host foreground token.
 - `1.1.8` — switching sidebar sessions no longer pops up the iPhone keyboard.
 - `1.1.7` — right swipe opens the sidebar; tap the conversation content to close it.
 - `1.1.6` — sidebar swipe gestures.

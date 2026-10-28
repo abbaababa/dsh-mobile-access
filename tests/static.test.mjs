@@ -105,6 +105,33 @@ test('client artifact carries the sidebar/main panel contract and theme tokens',
   assert.match(source, /isAppleMobile/)
 })
 
+test('panel styles pair every inverting brand fill with its foreground token', () => {
+  const css = read('src/panel.css')
+  // --dsw-alias-brand-primary is ink that flips (#0f1115 light -> #f9fafb dark); a hardcoded
+  // #fff foreground on it is invisible in dark mode (1.05:1) and is exactly the white block.
+  const brandFilled = css.split('}').filter((block) => block.includes('background:var(--dsw-alias-brand-primary'))
+  assert.equal(brandFilled.length, 2, 'both brand-filled surfaces must stay audited')
+  for (const block of brandFilled) {
+    assert.match(block, /color:var\(--dsw-alias-label-primary-foreground,#fff\)/, `unpaired brand fill: ${block.trim()}`)
+  }
+  assert.doesNotMatch(css, /(?:^|[;{\s])color:#fff\b/i, 'hardcoded white text breaks dark mode')
+  const built = read('client.js')
+  assert.equal((built.match(/--dsw-alias-label-primary-foreground/g) ?? []).length >= 2, true, 'build must ship the paired token')
+  assert.equal((built.match(/color:#fff\b/g) ?? []).length, 0, 'build must not ship hardcoded white text')
+})
+
+test('panel styles follow the host theme attribute and keep iOS filter fallbacks', () => {
+  const css = read('src/panel.css')
+  assert.match(css, /\.dsh-ma\{[^}]*background:var\(--dsw-alias-bg-base,#fff\)/, 'panel root must paint its own theme background')
+  assert.match(css, /body\[data-ds-dark-theme\] \.dsh-ma\{color-scheme:dark\}/)
+  assert.match(css, /body:not\(\[data-ds-dark-theme\]\) \.dsh-ma\{color-scheme:light\}/)
+  assert.doesNotMatch(css, /prefers-color-scheme/, 'host theme is an attribute; an OS query would mismatch manual toggles')
+  assert.equal(read('client.js').includes('body[data-ds-dark-theme] .dsh-ma{color-scheme:dark}'), true, 'build must ship the scoped rule')
+  for (const block of css.split('}').filter((candidate) => /(?:^|[;\s])backdrop-filter\s*:/.test(candidate))) {
+    assert.match(block, /-webkit-backdrop-filter\s*:/, 'iOS < 18 needs the -webkit- prefix')
+  }
+})
+
 test('locale dictionaries are complete and paired', () => {
   const zh = JSON.parse(read('locale/zh.json'))
   const en = JSON.parse(read('locale/en.json'))
