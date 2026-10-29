@@ -10,6 +10,11 @@ function descriptor(object, key) {
 }
 
 function harness() {
+  // A controllable clock keeps the 800ms swipe-duration gate deterministic.
+  let clock = Date.now()
+  class TestDate extends Date {
+    static now() { return clock }
+  }
   const registrations = []
   const cleanups = []
   const errors = []
@@ -195,7 +200,7 @@ function harness() {
     setInterval,
     clearInterval,
     URL,
-    Date,
+    Date: TestDate,
     Math,
     JSON,
     String,
@@ -211,7 +216,7 @@ function harness() {
   }
   context.HTMLInputElement = HTMLInputElement
   context.globalThis = context
-  return { context, errors, registrations, listeners, execCommands, headChildren, layout, emit, set sidebarCollapsed(value) { sidebarCollapsed = value }, get sidebarToggles() { return sidebarToggles }, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
+  return { context, errors, registrations, listeners, execCommands, headChildren, layout, emit, advance(ms) { clock += ms }, set sidebarCollapsed(value) { sidebarCollapsed = value }, get sidebarToggles() { return sidebarToggles }, get definition() { return definition }, get panel() { return panel }, get icon() { return icon }, React, locale, slots }
 }
 
 test('client bundle registers the sidebar entry and renders the panel without throwing', async () => {
@@ -367,27 +372,101 @@ test('client bundle registers the sidebar entry and renders the panel without th
   h.emit('focusin', { target: composer })
   assert.equal(composerBlurred, 1, 'a deliberate composer tap must keep native focus')
 
-  // A horizontal swipe toggles the sidebar: right opens a collapsed rail,
-  // left closes an expanded sidebar. The swipe target is outside controls.
-  const swipeTarget = { closest: () => null }
-  h.sidebarCollapsed = true
-  touchstart({ touches: [{ clientX: 100, clientY: 420 }], changedTouches: [{ clientX: 100, clientY: 420 }], target: swipeTarget })
-  touchend({ touches: [], changedTouches: [{ clientX: 220, clientY: 430 }] })
-  assert.equal(h.sidebarToggles, 2, 'right swipe must open the collapsed sidebar')
-  h.sidebarCollapsed = false
-  touchstart({ touches: [{ clientX: 300, clientY: 420 }], changedTouches: [{ clientX: 300, clientY: 420 }], target: swipeTarget })
-  touchend({ touches: [], changedTouches: [{ clientX: 180, clientY: 430 }] })
-  assert.equal(h.sidebarToggles, 2, 'left swipe must no longer close the sidebar')
-
   // A normal tap in the conversation content closes the expanded sidebar.
   const contentTarget = { closest: () => null }
+  const togglesBeforeContentTap = h.sidebarToggles
   h.emit('click', { target: contentTarget, clientX: 320 })
-  assert.equal(h.sidebarToggles, 3, 'a content tap must close the expanded sidebar')
+  assert.equal(h.sidebarToggles, togglesBeforeContentTap + 1, 'a content tap must close the expanded sidebar')
   h.emit('click', { target: contentTarget, clientX: 100 })
-  assert.equal(h.sidebarToggles, 3, 'a tap in the sidebar column must not toggle it')
+  assert.equal(h.sidebarToggles, togglesBeforeContentTap + 1, 'a tap in the sidebar column must not toggle it')
   const buttonTarget = { closest: (selector) => selector.includes('button') ? {} : null }
   h.emit('click', { target: buttonTarget, clientX: 320 })
-  assert.equal(h.sidebarToggles, 3, 'an interactive target must keep its click')
+  assert.equal(h.sidebarToggles, togglesBeforeContentTap + 1, 'an interactive target must keep its click')
+
+  // Right swipe on iPhone opens the collapsed sidebar. The gesture used to be
+  // silently dead whenever the finger started on a plan card, because every
+  // card is wrapped in a <button> and buttons were on the block list. Cards
+  // must stay swipeable; only the click Safari synthesises after a recognised
+  // swipe is cancelled, so the card is not activated by the gesture.
+  const swipeTarget = { closest: () => null }
+  const cardButtonTarget = {
+    closest(selector) {
+      // Mirrors the real DOM: the touched node sits inside a <button>, so only
+      // an explicit standalone "button" selector matches.
+      return /(^|,)\s*button(\s|,|$)/.test(selector) ? {} : null
+    },
+  }
+  const swipe = (from, to, options = {}) => {
+    h.advance(options.waitBefore ?? 1000)
+    h.sidebarCollapsed = options.collapsed ?? true
+    touchstart({
+      touches: [{ clientX: from.x, clientY: from.y }],
+      changedTouches: [{ clientX: from.x, clientY: from.y }],
+      target: options.target ?? swipeTarget,
+    })
+    h.advance(options.elapsed ?? 120)
+    if (options.cancel === true) h.emit('touchcancel', {})
+    else touchend({ touches: [], changedTouches: [{ clientX: to.x, clientY: to.y }] })
+  }
+  const togglesBeforeSwipe = h.sidebarToggles
+
+  swipe({ x: 100, y: 420 }, { x: 220, y: 430 })
+  assert.equal(h.sidebarToggles, togglesBeforeSwipe + 1, 'right swipe must open the collapsed sidebar')
+
+  // The regression the user hit: the swipe starts on a plan card button.
+  swipe({ x: 100, y: 420 }, { x: 240, y: 425 }, { target: cardButtonTarget })
+  assert.equal(
+    h.sidebarToggles,
+    togglesBeforeSwipe + 2,
+    'a right swipe that starts on a card button must still open the sidebar',
+  )
+
+  // The click fired on release must be swallowed instead of tapping the card.
+  let suppressedPrevented = false
+  let suppressedStopped = false
+  h.emit('click', {
+    target: cardButtonTarget,
+    clientX: 240,
+    preventDefault() { suppressedPrevented = true },
+    stopImmediatePropagation() { suppressedStopped = true },
+  })
+  assert.equal(suppressedPrevented, true, 'the synthetic click after a recognised swipe must be prevented')
+  assert.equal(suppressedStopped, true, 'the synthetic click must be stopped before it reaches the card')
+  assert.equal(h.sidebarToggles, togglesBeforeSwipe + 2, 'the swallowed click must not toggle the sidebar again')
+
+  // After the suppression window a deliberate tap must click normally again.
+  h.advance(1000)
+  let laterPrevented = false
+  h.emit('click', { target: cardButtonTarget, clientX: 240, preventDefault() { laterPrevented = true }, stopImmediatePropagation() {} })
+  assert.equal(laterPrevented, false, 'a later deliberate tap must not be suppressed')
+
+  // Left swipes, short drags, vertical drags, slow drags, edge starts,
+  // multi-touch and cancelled touches must all stay inert.
+  swipe({ x: 300, y: 420 }, { x: 180, y: 430 })
+  swipe({ x: 100, y: 420 }, { x: 160, y: 425 })
+  swipe({ x: 100, y: 420 }, { x: 200, y: 640 })
+  swipe({ x: 100, y: 420 }, { x: 220, y: 430 }, { elapsed: 900 })
+  swipe({ x: 10, y: 420 }, { x: 200, y: 430 })
+  swipe({ x: 380, y: 420 }, { x: 200, y: 430 })
+  swipe({ x: 100, y: 420 }, { x: 220, y: 430 }, { cancel: true })
+  h.advance(1000)
+  h.sidebarCollapsed = true
+  touchstart({
+    touches: [{ clientX: 100, clientY: 420 }, { clientX: 140, clientY: 420 }],
+    changedTouches: [{ clientX: 100, clientY: 420 }],
+    target: swipeTarget,
+  })
+  h.advance(120)
+  touchend({ touches: [], changedTouches: [{ clientX: 260, clientY: 430 }] })
+  assert.equal(h.sidebarToggles, togglesBeforeSwipe + 2, 'only the two valid right swipes may toggle the sidebar')
+
+  // An installed PWA has no system back/forward swipe, so an edge start is
+  // allowed there even though a normal Safari tab must avoid it.
+  const originalMatchMedia = h.context.window.matchMedia
+  h.context.window.matchMedia = (query) => ({ matches: query === '(display-mode: standalone)' })
+  swipe({ x: 10, y: 420 }, { x: 200, y: 430 })
+  h.context.window.matchMedia = originalMatchMedia
+  assert.equal(h.sidebarToggles, togglesBeforeSwipe + 3, 'an installed PWA may start the swipe at the screen edge')
 
   for (const cleanup of effects.reverse()) cleanup()
   assert.equal(h.context.navigator.clipboard, undefined)
@@ -395,6 +474,7 @@ test('client bundle registers the sidebar entry and renders the panel without th
   assert.equal(h.listeners.has('pointerdown'), false)
   assert.equal(h.listeners.has('touchstart'), false)
   assert.equal(h.listeners.has('touchend'), false)
+  assert.equal(h.listeners.has('touchcancel'), false)
   assert.equal(h.listeners.has('focusin'), false)
   assert.equal(h.listeners.has('click'), false)
   assert.equal(h.headChildren.length, 0, 'zoom guard style must be removed on cleanup')

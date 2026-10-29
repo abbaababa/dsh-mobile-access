@@ -1,3 +1,25 @@
+## 1.1.10 — 2026-10-29
+
+- Fix the iPhone right-swipe to open the sidebar dying on most of the content.
+  Plan/task cards are wrapped in a `<button>`, and `button`, `a` and
+  `[role="button"]` were on the gesture block list, so `touchstart` returned
+  silently for roughly 89% of the content area. Buttons and links are now
+  swipeable; a recognised swipe cancels the synthetic click that Safari fires
+  on release, so the card is not activated by the gesture. Text fields,
+  sliders, code blocks, the composer, menus and the right panel keep the
+  gesture disabled.
+- Only a rightward drag opens the collapsed rail. `Math.abs(dx)` accepted left
+  swipes too, contradicting the documented right-swipe-to-open behaviour.
+- A `touchcancel` now drops the pending touch, so an interrupted gesture can
+  no longer be paired with a later unrelated `touchend`.
+- Treat `matchMedia('(display-mode: standalone)')` as installed, matching the
+  `isStandalone()` helper used elsewhere; an installed PWA may start the swipe
+  at the screen edge, a normal Safari tab still keeps its 24px system-gesture
+  margin.
+- Extend the swipe regression test to card-button targets, left/short/vertical/
+  slow/edge/multi-touch/cancelled gestures, PWA edge starts and click
+  suppression.
+
 ## 1.1.9 — 2026-10-28
 
 - Fix the iPhone/iPad dark-mode white blocks in the Mobile Access panel. The

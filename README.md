@@ -22,20 +22,20 @@
 
 ## 安全吗？会偷看或上传我的文件吗？
 
-**结论：按 1.1.9 的源码和 npm 发布包检查，没有发现窃取文件、上传数据或远程控制的行为。**
+**结论：按 1.1.10（与 1.1.9 同一依赖集，无生产依赖）的源码和 npm 发布包检查，没有发现窃取文件、上传数据或远程控制的行为。**
 
 - **没有生产依赖**：`dependencies` 是空的；安装包只含运行所需的 JS、配置、图标和说明。
 - **没有危险能力**：服务端只用到 Node 自带的 `http`、`net`、`os` 和 Web Crypto；没有读文件的 `fs`、没有执行命令的 `child_process`、没有 `eval`。
 - **没有第三方服务器**：手机和电脑之间的配对、页面、WebSocket 只在你的局域网或你自己的 Tailscale 内；配对码和 Cookie 只发给这台 DSH。
 - **不主动读取或保存内容**：插件不读取聊天记录、不扫描文件；局域网网关只转发你主动发起的 HTTP/WebSocket 请求，不另存一份。
-- **自动检查结果**：`npm audit --omit=dev` 为 **0 个漏洞**；npm 已校验 1.1.9 发布包的 registry 签名；35 项自动测试和 Ubuntu/Windows CI 均通过。
-- **边界也要知道**：插件运行在 DSH 进程权限内；请只从 npm 安装固定版本，不要把 8 位配对码给不信任的人；在公共 Wi-Fi 下建议关闭网关或改用 Tailscale。任何软件都有供应链风险，锁定 `1.1.9` 比盲目使用 `@latest` 更稳妥。
+- **自动检查结果**：`npm audit --omit=dev` 为 **0 个漏洞**；npm 在安装时会校验发布包的 registry 签名；35 项自动测试和 Ubuntu/Windows CI 均通过。
+- **边界也要知道**：插件运行在 DSH 进程权限内；请只从 npm 安装固定版本，不要把 8 位配对码给不信任的人；在公共 Wi-Fi 下建议关闭网关或改用 Tailscale。任何软件都有供应链风险，锁定 `1.1.10` 比盲目使用 `@latest` 更稳妥。
 
 技术用户可以自己复核：
 
 ```bash
 cd /path/to/dsh-mobile-access
-npm view dsh-mobile-access@1.1.9 dependencies
+npm view dsh-mobile-access@1.1.10 dependencies
 npm audit --omit=dev
 npm audit signatures
 grep -RInE "child_process|exec\\(|eval\\(|https?://" src
@@ -67,13 +67,13 @@ wrong attempts.
 Mac Terminal:
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.10 --registry=https://registry.npmjs.org/
 ```
 
 Windows 10/11 PowerShell (no administrator mode needed):
 
 ```powershell
-dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.10 --registry=https://registry.npmjs.org/
 ```
 
 Then refresh the DSH page, open **Mobile Access** in the left sidebar, and use
@@ -184,7 +184,7 @@ Windows 和 Mac 最需要额外注意的区别是：
 #### 第 2 步：复制下面这一条命令，粘贴，回车
 
 ```powershell
-dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.10 --registry=https://registry.npmjs.org/
 ```
 
 这条命令只做三件事：
@@ -329,7 +329,7 @@ iPhone 打开「设置 → 无线局域网」，确认和电脑连的是同一�
 ### 第 2 步：在 Mac 终端或 Windows PowerShell 执行一条命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.10 --registry=https://registry.npmjs.org/
 ```
 
 这条命令做三件事：
@@ -646,7 +646,7 @@ iPhone 软键盘没有可用的 Shift 键，因此插件在 **iOS / iPadOS** 上
 ### 推荐：npm 官方命令
 
 ```bash
-dsh plugin --profile web add dsh-mobile-access@1.1.9 --registry=https://registry.npmjs.org/
+dsh plugin --profile web add dsh-mobile-access@1.1.10 --registry=https://registry.npmjs.org/
 ```
 
 ### 使用 `@latest`
@@ -776,7 +776,8 @@ dsh plugin --profile web remove dsh-mobile-access
 - `1.1.0` — 回环监听自动局域网网关（macOS / Windows，HTTP + `/api/remote.mux` WebSocket）。
 - `1.1.1` — iPhone / iPad 上模型选择页 16px 缩放守卫。
 - `1.1.2` — 打开模型选择时不自动弹键盘、不整体上移。
-- `1.1.9` — 修复 iPhone / iPad 深色模式下“手机访问”面板的白底白字白块；主按钮与标志文字改用宿主成对前景令牌；当前 npm `latest`。
+- `1.1.10` — 修复 iPhone / iPad 上“卡片区域右滑无法展开左侧栏”：卡片整体是 `<button>`，而按钮被手势黑名单拦住，圈定区域内约 89% 面积失效；现在按钮/链接可滑，滑动结束后抑制合成点击，左滑不再误开，补 `touchcancel`，`display-mode: standalone` 视为已安装；当前 npm `latest`。
+- `1.1.9` — 修复 iPhone / iPad 深色模式下“手机访问”面板的白底白字白块；主按钮与标志文字改用宿主成对前景令牌。
 - `1.1.8` — iPhone / iPad 上切换会话后不再自动弹出输入法键盘。
 - `1.1.7` — iPhone / iPad 上右滑展开左侧栏，点击内容区收起。
 - `1.1.6` — iPhone / iPad 上右滑展开、左滑收起左侧栏。

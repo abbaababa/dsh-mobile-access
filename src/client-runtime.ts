@@ -396,8 +396,11 @@ function installIOSSidebarTapGuard(layout?: LayoutService): () => void {
  * Right swipe on iPhone opens the left sidebar. The closing gesture is a tap
  * on the content area (not a left swipe): a normal tap is easier to discover
  * and does not compete with horizontal scrolling. The swipe is scoped to the
- * content area and ignores vertical movement, editable controls, menus, code
- * blocks and the right panel. On a normal Safari tab we stay 24px away from the
+ * content area and ignores vertical movement, text/selection controls, menus,
+ * code blocks and the right panel. Plain buttons and links stay swipeable:
+ * whole cards are wrapped in a <button>, so excluding them silently disabled
+ * the gesture on most of the content. The click that would follow a recognised
+ * swipe is cancelled instead. On a normal Safari tab we stay 24px away from the
  * screen edges so the system back/forward gesture keeps priority; an installed
  * PWA has no such gesture, so edge starts are allowed there. Mac never installs
  * this listener.
@@ -406,12 +409,38 @@ function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
   if (!isAppleMobile() || layout === undefined) return () => undefined
   const doc = document
   let pending: { x: number; y: number; startedAt: number } | null = null
+  let suppressClickUntil = 0
+  // Hard blockers only: controls that own a horizontal drag themselves (text
+  // selection, sliders, code blocks, the composer, menus, the right panel).
+  // Plain buttons and links are deliberately allowed; the synthetic click that
+  // Safari fires after a swipe is cancelled in onClickCapture instead.
   const isBlocked = (target: Element): boolean =>
-    target.closest('input, textarea, select, [contenteditable="true"], [data-composer-card], pre, code, [role="slider"], [data-rightbar], [role="menu"], [role="listbox"], button, a, [role="button"]') !== null
+    target.closest('input, textarea, select, [contenteditable="true"], [data-composer-card], pre, code, [role="slider"], [data-rightbar], [role="menu"], [role="listbox"]') !== null
   const point = (event: Event): { x: number; y: number } | null => {
     const touches = (event as TouchEvent).changedTouches ?? (event as TouchEvent).touches
     const touch = touches?.[0]
     return touch === undefined ? null : { x: touch.clientX, y: touch.clientY }
+  }
+  const isStandaloneDisplay = (): boolean => {
+    if ((navigator as Navigator & { standalone?: boolean }).standalone === true) return true
+    try {
+      return window.matchMedia('(display-mode: standalone)').matches === true
+    } catch {
+      return false
+    }
+  }
+  const onClickCapture = (event: Event): void => {
+    if (Date.now() > suppressClickUntil) return
+    suppressClickUntil = 0
+    try {
+      event.preventDefault()
+      event.stopImmediatePropagation()
+    } catch {
+      // A synthetic click that cannot be cancelled is still harmless.
+    }
+  }
+  const onTouchCancel = (): void => {
+    pending = null
   }
   const onTouchStart = (event: Event): void => {
     pending = null
@@ -421,8 +450,7 @@ function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
     if (target === null || typeof target.closest !== 'function' || isBlocked(target)) return
     const at = point(event)
     if (at === null) return
-    const standalone = (navigator as Navigator & { standalone?: boolean }).standalone === true
-    if (!standalone && (at.x < 24 || at.x > window.innerWidth - 24)) return
+    if (!isStandaloneDisplay() && (at.x < 24 || at.x > window.innerWidth - 24)) return
     pending = { x: at.x, y: at.y, startedAt: Date.now() }
   }
   const onTouchEnd = (event: Event): void => {
@@ -434,9 +462,15 @@ function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
     if (at === null) return
     const dx = at.x - x
     const dy = at.y - y
-    if (Math.abs(dx) < 70 || Math.abs(dx) <= Math.abs(dy) * 1.5) return
+    // Signed delta: only a rightward drag opens the collapsed rail. The old
+    // Math.abs(dx) check let a left swipe open it too, contradicting the
+    // documented "right swipe opens" behaviour.
+    if (dx < 70 || dx <= Math.abs(dy) * 1.5) return
     const collapsed = doc.querySelector('[data-sidebar-collapsed]') !== null
     if (!collapsed) return
+    // The finger may have started on a button, so cancel the click that would
+    // otherwise fire on release and re-activate that button.
+    suppressClickUntil = Date.now() + 600
     try {
       layout.toggleSidebar()
     } catch {
@@ -445,9 +479,13 @@ function installIOSSidebarSwipeGuard(layout?: LayoutService): () => void {
   }
   doc.addEventListener('touchstart', onTouchStart, true)
   doc.addEventListener('touchend', onTouchEnd, true)
+  doc.addEventListener('touchcancel', onTouchCancel, true)
+  doc.addEventListener('click', onClickCapture, true)
   return () => {
     doc.removeEventListener('touchstart', onTouchStart, true)
     doc.removeEventListener('touchend', onTouchEnd, true)
+    doc.removeEventListener('touchcancel', onTouchCancel, true)
+    doc.removeEventListener('click', onClickCapture, true)
   }
 }
 
